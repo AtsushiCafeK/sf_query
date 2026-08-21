@@ -1,0 +1,74 @@
+# =====================================================================
+# 稟議書ダウンローダ 設定ファイル（雛形）
+#
+# 使い方: このファイルを config.yaml にコピーして値を埋める。
+#         config.yaml は .gitignore 対象（機密を含むため）。
+#
+# ★TeamSpirit本番への切り替えは、基本この "ringi:" セクションの
+#   API名を差し替えるだけでよい。コード側は変更不要。
+# =====================================================================
+
+salesforce:
+  # 本番組織: https://login.salesforce.com
+  # Sandbox : https://test.salesforce.com
+  login_url: "https://login.salesforce.com"
+  api_version: "60.0"
+
+  oauth:
+    # 接続アプリの Consumer Key
+    client_id: "<CONNECTED_APP_CONSUMER_KEY>"
+    # PKCE公開クライアントなら空でよい。秘匿保管する構成なら設定。
+    client_secret: ""
+    # 接続アプリのコールバックURLと完全一致させる
+    redirect_uri: "http://localhost:8080/oauth/callback"
+    # ローカルコールバック受け口のポート（redirect_uriと揃える）
+    callback_port: 8080
+    scopes:
+      - "api"
+      - "refresh_token"
+      - "offline_access"
+
+# ---------------------------------------------------------------------
+# 稟議書オブジェクトのマッピング
+#   開発org（モック）→ 本番TeamSpirit は、ここの *_api_name を差し替える。
+# ---------------------------------------------------------------------
+ringi:
+  # 開発org: "Ringi__c" / 本番: 例 "teamspirit__XXXX__c"
+  object_api_name: "Ringi__c"
+
+  fields:
+    title: "Name"                        # 件名
+    status: "Status__c"                  # ステータス（絞り込み）
+    application_date: "ApplicationDate__c"  # 申請日（期間絞り込み）
+    amount: "Amount__c"                  # 任意
+    applicant: "Applicant__c"            # 任意
+
+  # レコードの種類（絞り込み）: DeveloperName で一致させる
+  record_type_developer_name_field: "RecordType.DeveloperName"
+
+  # UIプルダウンに出すレコードの種類。value=SOQLで使うDeveloperName / label=画面表示
+  record_types:
+    - { value: "Purchase", label: "購買稟議" }
+    - { value: "Contract", label: "契約稟議" }
+    - { value: "Payment",  label: "支払稟議" }
+
+  # UIプルダウンに出すステータス。value=保存値 / label=画面表示
+  statuses:
+    - { value: "Submitted", label: "申請中" }
+    - { value: "Approved",  label: "承認済" }
+    - { value: "Rejected",  label: "却下" }
+    - { value: "Returned",  label: "差戻し" }
+
+  # 添付方式: "files"(ContentDocument/Salesforce Files) または "attachment"(旧Attachment)
+  attachment_type: "files"
+
+# ---------------------------------------------------------------------
+# ダウンロード出力設定
+# ---------------------------------------------------------------------
+download:
+  # 出力先ディレクトリ
+  output_dir: "./downloads"
+  # ZIPにまとめるか
+  zip: true
+  # ファイル名の衝突回避に稟議レコード名/Idをフォルダ分けするか
+  group_by_record: true

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -216,3 +217,18 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+=======
+# 機密・実行時ファイル
+config/config.yaml
+.tokens.json
+.flask_secret
+downloads/
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+>>>>>>> bb71984 (first commit)

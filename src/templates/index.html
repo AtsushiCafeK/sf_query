@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>稟議書 添付ファイル一括ダウンロード</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: "Segoe UI", "Meiryo", system-ui, sans-serif; margin: 0; padding: 24px;
+           background: #f4f5f7; color: #1a1a1a; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #1c1f24; color: #e8e8e8; }
+      .card { background: #23272e; }
+      th { background: #2c313a; }
+      input, select, textarea { background: #1c1f24; color: #e8e8e8; border-color: #444; }
+      tr:nth-child(even) td { background: #262b32; }
+      .tab { color: #9aa4b2; }
+      .tab.active { background: #23272e; color: #e8e8e8; }
+    }
+    h1 { font-size: 1.3rem; margin: 0 0 16px; }
+    .card { background: #fff; border-radius: 10px; padding: 18px 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.12); margin-bottom: 20px; }
+    .grid { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    label { font-size: .8rem; opacity: .8; }
+    input, select, textarea { padding: 7px 9px; border: 1px solid #ccc; border-radius: 6px;
+                              font-size: .95rem; }
+    textarea { width: 100%; box-sizing: border-box; min-height: 96px; resize: vertical;
+               font-family: ui-monospace, "Consolas", monospace; font-size: .85rem; line-height: 1.5; }
+    button { padding: 9px 18px; border: 0; border-radius: 6px; font-size: .95rem; cursor: pointer; }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-download { background: #059669; color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-download:hover { background: #047857; }
+    /* タブ */
+    .tabs { display: flex; gap: 4px; margin-bottom: -1px; }
+    .tab { padding: 9px 18px; border-radius: 8px 8px 0 0; background: transparent; color: #555;
+           cursor: pointer; font-size: .92rem; border: 0; }
+    .tab.active { background: #fff; color: #1a1a1a; font-weight: 600;
+                  box-shadow: 0 -1px 4px rgba(0,0,0,.08); }
+    .card-tabbed { border-radius: 0 10px 10px 10px; }
+    .table-wrap { overflow-x: auto; margin-top: 14px; }
+    table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #e0e0e0; white-space: nowrap; }
+    th { background: #eef1f5; }
+    tr:nth-child(even) td { background: #f7f8fa; }
+    .badge { display: inline-block; min-width: 20px; text-align: center; padding: 1px 8px;
+             border-radius: 999px; font-size: .8rem; }
+    .has { background: #059669; color: #fff; }
+    .none { background: #9ca3af; color: #fff; }
+    .msg-error { background: #fee2e2; color: #991b1b; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; }
+    .msg-ok { background: #d1fae5; color: #065f46; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; }
+    .soql { font-family: ui-monospace, "Consolas", monospace; font-size: .8rem; opacity: .75;
+            word-break: break-all; margin-top: 6px; }
+    .muted { opacity: .6; }
+    .hint { font-size: .78rem; opacity: .7; margin-top: 6px; line-height: 1.6; }
+    code { font-family: ui-monospace, "Consolas", monospace; }
+    /* 接続状態バー */
+    .topbar { display: flex; justify-content: space-between; align-items: center;
+              flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+    .conn { display: flex; align-items: center; gap: 8px; font-size: .85rem; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+    .dot.on { background: #059669; }
+    .dot.dev { background: #d97706; }
+    .dot.off { background: #9ca3af; }
+    .btn-connect { background: #2563eb; color: #fff; text-decoration: none;
+                   display: inline-block; padding: 8px 16px; border-radius: 6px; font-size: .88rem; }
+    .btn-connect:hover { background: #1d4ed8; }
+    .btn-logout { background: transparent; color: inherit; border: 1px solid #bbb;
+                  padding: 6px 12px; font-size: .82rem; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1 style="margin:0;">稟議書 添付ファイル一括ダウンロード</h1>
+    {% if status %}
+      {% if status.connected and status.via == 'oauth' %}
+        <div class="conn">
+          <span class="dot on"></span>
+          <span>接続中：<strong>{{ status.user }}</strong></span>
+          <form method="post" action="/oauth/logout" style="margin:0;">
+            <button type="submit" class="btn-logout">切断</button>
+          </form>
+        </div>
+      {% elif status.connected and status.via == 'cli' %}
+        <div class="conn">
+          <span class="dot dev"></span>
+          <span class="muted">開発用接続（{{ status.user }}）</span>
+          <a class="btn-connect" href="/oauth/login">Salesforceに接続</a>
+        </div>
+      {% else %}
+        <div class="conn">
+          <span class="dot off"></span>
+          <span class="muted">未接続</span>
+          <a class="btn-connect" href="/oauth/login">Salesforceに接続</a>
+        </div>
+      {% endif %}
+    {% endif %}
+  </div>
+
+  {% if error %}
+    <div class="msg-error">⚠ {{ error }}</div>
+  {% endif %}
+
+  {% if download_summary %}
+    <div class="msg-ok">
+      ✔ ダウンロード完了：{{ download_summary.count }} ファイル
+      （対象 {{ download_summary.records_total }} 件中、添付あり {{ download_summary.records_with_attachment }} 件）<br>
+      保存先：<code>{{ download_summary.output_dir }}</code>
+      {% if download_summary.zip %}<br>ZIP：<code>{{ download_summary.zip }}</code>{% endif %}
+    </div>
+  {% endif %}
+
+  {% set active = mode or 'form' %}
+
+  <div class="tabs">
+    <button type="button" class="tab {% if active == 'form' %}active{% endif %}"
+            onclick="switchMode('form')">条件を選ぶ</button>
+    <button type="button" class="tab {% if active == 'soql' %}active{% endif %}"
+            onclick="switchMode('soql')">SOQLを直接入力</button>
+  </div>
+
+  <form class="card card-tabbed" method="post" action="/search" id="searchForm">
+    <input type="hidden" name="mode" id="modeInput" value="{{ active }}">
+
+    <!-- モード1: プルダウンで条件選択 -->
+    <div id="pane-form" style="{% if active != 'form' %}display:none;{% endif %}">
+      <div class="grid">
+        <div class="field">
+          <label>レコードの種類</label>
+          <select name="record_type">
+            <option value="">（指定なし）</option>
+            {% for rt in config.ringi.record_types %}
+              <option value="{{ rt.value }}" {% if filters.record_type == rt.value %}selected{% endif %}>{{ rt.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>ステータス</label>
+          <select name="status">
+            <option value="">（指定なし）</option>
+            {% for st in config.ringi.statuses %}
+              <option value="{{ st.value }}" {% if filters.status == st.value %}selected{% endif %}>{{ st.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>申請日（開始）</label>
+          <input type="date" name="date_from" value="{{ filters.date_from or '' }}">
+        </div>
+        <div class="field">
+          <label>申請日（終了）</label>
+          <input type="date" name="date_to" value="{{ filters.date_to or '' }}">
+        </div>
+      </div>
+    </div>
+
+    <!-- モード2: SOQL直接入力 -->
+    <div id="pane-soql" style="{% if active != 'soql' %}display:none;{% endif %}">
+      <label for="raw_soql">SOQL（貼り付け可・任意のオブジェクト／項目に対応）</label>
+      <textarea id="raw_soql" name="raw_soql" spellcheck="false">{{ raw_soql or '' }}</textarea>
+      <div class="hint">
+        ・<code>SELECT</code> で始まる読み取り専用のクエリのみ実行できます。<br>
+        ・添付ファイルの取得に使うため、<strong>SELECT句に <code>Id</code> を必ず含めてください</strong>。<br>
+        ・表示される列は、クエリで指定した項目に自動で追随します。
+      </div>
+    </div>
+
+    <div style="margin-top:16px;">
+      <button type="submit" class="btn-primary">検索</button>
+    </div>
+  </form>
+
+  {% if results is defined and results is not none %}
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+        <strong>{{ results|length }} 件{% if object_name %} <span class="muted">/ {{ object_name }}</span>{% endif %}</strong>
+        {% if results|length > 0 %}
+          <form method="post" action="/download" style="margin:0;">
+            <input type="hidden" name="mode" value="{{ active }}">
+            <input type="hidden" name="record_type" value="{{ filters.record_type or '' }}">
+            <input type="hidden" name="status" value="{{ filters.status or '' }}">
+            <input type="hidden" name="date_from" value="{{ filters.date_from or '' }}">
+            <input type="hidden" name="date_to" value="{{ filters.date_to or '' }}">
+            <input type="hidden" name="raw_soql" value="{{ raw_soql or '' }}">
+            <button type="submit" class="btn-download">添付ファイルを一括ダウンロード</button>
+          </form>
+        {% endif %}
+      </div>
+
+      {% if soql %}<div class="soql">SOQL: {{ soql }}</div>{% endif %}
+
+      {% if results|length > 0 %}
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                {% for col in columns %}<th>{{ col }}</th>{% endfor %}
+                <th>添付</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in results %}
+                <tr>
+                  {% for v in row.cells %}<td>{{ '' if v is none else v }}</td>{% endfor %}
+                  <td>
+                    {% if row.attachments > 0 %}
+                      <span class="badge has">{{ row.attachments }}</span>
+                    {% else %}
+                      <span class="badge none">0</span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="muted" style="margin-top:12px;">該当するレコードがありません。条件を変えて再検索してください。</p>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <script>
+    function switchMode(mode) {
+      document.getElementById('modeInput').value = mode;
+      document.getElementById('pane-form').style.display = (mode === 'form') ? '' : 'none';
+      document.getElementById('pane-soql').style.display = (mode === 'soql') ? '' : 'none';
+      document.querySelectorAll('.tab').forEach(function (el, i) {
+        el.classList.toggle('active', (i === 0) === (mode === 'form'));
+      });
+    }
+  </script>
+</body>
+</html>
