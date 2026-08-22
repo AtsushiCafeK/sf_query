@@ -7,7 +7,7 @@
   <style>
     :root { color-scheme: light dark; }
     body { font-family: "Segoe UI", "Meiryo", system-ui, sans-serif; margin: 0; padding: 24px;
-           background: #f4f5f7; color: #1a1a1a; }
+           background: #332; color: #1a1a1a; }
     @media (prefers-color-scheme: dark) {
       body { background: #1c1f24; color: #e8e8e8; }
       .card { background: #23272e; }
@@ -18,7 +18,7 @@
       .tab.active { background: #23272e; color: #e8e8e8; }
     }
     h1 { font-size: 1.3rem; margin: 0 0 16px; }
-    .card { background: #fff; border-radius: 10px; padding: 18px 20px;
+    .card { background: #333; border-radius: 10px; padding: 18px 20px;
             box-shadow: 0 1px 4px rgba(0,0,0,.12); margin-bottom: 20px; }
     .grid { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
     .field { display: flex; flex-direction: column; gap: 4px; }
@@ -28,27 +28,27 @@
     textarea { width: 100%; box-sizing: border-box; min-height: 96px; resize: vertical;
                font-family: ui-monospace, "Consolas", monospace; font-size: .85rem; line-height: 1.5; }
     button { padding: 9px 18px; border: 0; border-radius: 6px; font-size: .95rem; cursor: pointer; }
-    .btn-primary { background: #2563eb; color: #fff; }
-    .btn-download { background: #059669; color: #fff; }
+    .btn-primary { background: #2563eb; color: #333; }
+    .btn-download { background: #059669; color: #333; }
     .btn-primary:hover { background: #1d4ed8; }
     .btn-download:hover { background: #047857; }
     /* タブ */
     .tabs { display: flex; gap: 4px; margin-bottom: -1px; }
     .tab { padding: 9px 18px; border-radius: 8px 8px 0 0; background: transparent; color: #555;
            cursor: pointer; font-size: .92rem; border: 0; }
-    .tab.active { background: #fff; color: #1a1a1a; font-weight: 600;
+    .tab.active { background: #333; color: #1a1a1a; font-weight: 600;
                   box-shadow: 0 -1px 4px rgba(0,0,0,.08); }
     .card-tabbed { border-radius: 0 10px 10px 10px; }
     .table-wrap { overflow-x: auto; margin-top: 14px; }
     table { border-collapse: collapse; width: 100%; font-size: .9rem; }
     th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #e0e0e0; white-space: nowrap; }
-    th { background: #eef1f5; }
-    tr:nth-child(even) td { background: #f7f8fa; }
+    th { background: #332; }
+    tr:nth-child(even) td { background: #332; }
     .badge { display: inline-block; min-width: 20px; text-align: center; padding: 1px 8px;
              border-radius: 999px; font-size: .8rem; }
-    .has { background: #059669; color: #fff; }
-    .none { background: #9ca3af; color: #fff; }
-    .msg-error { background: #fee2e2; color: #991b1b; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; }
+    .has { background: #059669; color: #333; }
+    .none { background: #9ca3af; color: #333; }
+    .msg-error { background: #332; color: #991b1b; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; }
     .msg-ok { background: #d1fae5; color: #065f46; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; }
     .soql { font-family: ui-monospace, "Consolas", monospace; font-size: .8rem; opacity: .75;
             word-break: break-all; margin-top: 6px; }
@@ -63,7 +63,7 @@
     .dot.on { background: #059669; }
     .dot.dev { background: #d97706; }
     .dot.off { background: #9ca3af; }
-    .btn-connect { background: #2563eb; color: #fff; text-decoration: none;
+    .btn-connect { background: #2563eb; color: #333; text-decoration: none;
                    display: inline-block; padding: 8px 16px; border-radius: 6px; font-size: .88rem; }
     .btn-connect:hover { background: #1d4ed8; }
     .btn-logout { background: transparent; color: inherit; border: 1px solid #bbb;
