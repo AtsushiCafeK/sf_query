@@ -5,69 +5,78 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>添付ファイル一括ダウンロード</title>
   <style>
-    :root { color-scheme: light dark; }
-    body { font-family: "Segoe UI", "Meiryo", system-ui, sans-serif; margin: 0; padding: 24px;
-           background: #332; color: #1a1a1a; }
-    @media (prefers-color-scheme: dark) {
-      body { background: #1c1f24; color: #e8e8e8; }
-      .card { background: #23272e; }
-      th { background: #2c313a; }
-      input, select, textarea { background: #1c1f24; color: #e8e8e8; border-color: #444; }
-      tr:nth-child(even) td { background: #262b32; }
-      .tab { color: #9aa4b2; }
-      .tab.active { background: #23272e; color: #e8e8e8; }
+    /* ===== ダークモード専用の配色（ライトモードの分岐は持たない） ===== */
+    :root {
+      color-scheme: dark;            /* 日付ピッカー等のネイティブUIもダークにする */
+      --bg: #1c1f24;                 /* ページ背景 */
+      --surface: #23272e;            /* カード */
+      --surface-2: #2c313a;          /* テーブル見出し */
+      --surface-3: #262b32;          /* テーブル縞 */
+      --text: #e8e8e8;
+      --text-muted: #9aa4b2;
+      --border: #39404a;
+      --accent: #2563eb;             /* 主要ボタン（白文字で 5.1:1） */
+      --accent-hover: #1d4ed8;
+      --success: #047857;            /* 実行系ボタン（白文字で 5.6:1） */
+      --success-hover: #065f46;
+      --on-accent: #ffffff;
     }
+    body { font-family: "Segoe UI", "Meiryo", system-ui, sans-serif; margin: 0; padding: 24px;
+           background: var(--bg); color: var(--text); }
     h1 { font-size: 1.3rem; margin: 0 0 16px; }
-    .card { background: #333; border-radius: 10px; padding: 18px 20px;
-            box-shadow: 0 1px 4px rgba(0,0,0,.12); margin-bottom: 20px; }
+    .card { background: var(--surface); border-radius: 10px; padding: 18px 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.35); margin-bottom: 20px; }
     .grid { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
     .field { display: flex; flex-direction: column; gap: 4px; }
-    label { font-size: .8rem; opacity: .8; }
-    input, select, textarea { padding: 7px 9px; border: 1px solid #ccc; border-radius: 6px;
-                              font-size: .95rem; }
+    label { font-size: .8rem; color: var(--text-muted); }
+    input, select, textarea { padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px;
+                              font-size: .95rem; background: var(--bg); color: var(--text); }
+    input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
     textarea { width: 100%; box-sizing: border-box; min-height: 96px; resize: vertical;
                font-family: ui-monospace, "Consolas", monospace; font-size: .85rem; line-height: 1.5; }
     button { padding: 9px 18px; border: 0; border-radius: 6px; font-size: .95rem; cursor: pointer; }
-    .btn-primary { background: #2563eb; color: #333; }
-    .btn-download { background: #059669; color: #333; }
-    .btn-primary:hover { background: #1d4ed8; }
-    .btn-download:hover { background: #047857; }
+    .btn-primary { background: var(--accent); color: var(--on-accent); }
+    .btn-download { background: var(--success); color: var(--on-accent); }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-download:hover { background: var(--success-hover); }
     /* タブ */
     .tabs { display: flex; gap: 4px; margin-bottom: -1px; }
-    .tab { padding: 9px 18px; border-radius: 8px 8px 0 0; background: transparent; color: #555;
+    .tab { padding: 9px 18px; border-radius: 8px 8px 0 0; background: transparent; color: var(--text-muted);
            cursor: pointer; font-size: .92rem; border: 0; }
-    .tab.active { background: #333; color: #1a1a1a; font-weight: 600;
-                  box-shadow: 0 -1px 4px rgba(0,0,0,.08); }
+    .tab.active { background: var(--surface); color: var(--text); font-weight: 600; }
     .card-tabbed { border-radius: 0 10px 10px 10px; }
     .table-wrap { overflow-x: auto; margin-top: 14px; }
     table { border-collapse: collapse; width: 100%; font-size: .9rem; }
-    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #e0e0e0; white-space: nowrap; }
-    th { background: #332; }
-    tr:nth-child(even) td { background: #332; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    th { background: var(--surface-2); }
+    tr:nth-child(even) td { background: var(--surface-3); }
     .badge { display: inline-block; min-width: 20px; text-align: center; padding: 1px 8px;
              border-radius: 999px; font-size: .8rem; }
-    .has { background: #059669; color: #333; }
-    .none { background: #9ca3af; color: #333; }
-    .msg-error { background: #332; color: #991b1b; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; }
-    .msg-ok { background: #d1fae5; color: #065f46; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; }
-    .soql { font-family: ui-monospace, "Consolas", monospace; font-size: .8rem; opacity: .75;
+    .has { background: var(--success); color: var(--on-accent); }
+    .none { background: #4b5563; color: #e5e7eb; }
+    .msg-error { background: #3b1f22; color: #fca5a5; border-left: 3px solid #ef4444;
+                 padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; }
+    .msg-ok { background: #14352a; color: #6ee7b7; border-left: 3px solid #10b981;
+              padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; }
+    .soql { font-family: ui-monospace, "Consolas", monospace; font-size: .8rem; color: var(--text-muted);
             word-break: break-all; margin-top: 6px; }
-    .muted { opacity: .6; }
-    .hint { font-size: .78rem; opacity: .7; margin-top: 6px; line-height: 1.6; }
+    .muted { color: var(--text-muted); }
+    .hint { font-size: .78rem; color: var(--text-muted); margin-top: 6px; line-height: 1.6; }
     code { font-family: ui-monospace, "Consolas", monospace; }
     /* 接続状態バー */
     .topbar { display: flex; justify-content: space-between; align-items: center;
               flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
     .conn { display: flex; align-items: center; gap: 8px; font-size: .85rem; }
     .dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
-    .dot.on { background: #059669; }
-    .dot.dev { background: #d97706; }
+    .dot.on { background: #10b981; }
+    .dot.dev { background: #f59e0b; }
     .dot.off { background: #9ca3af; }
-    .btn-connect { background: #2563eb; color: #333; text-decoration: none;
+    .btn-connect { background: var(--accent); color: var(--on-accent); text-decoration: none;
                    display: inline-block; padding: 8px 16px; border-radius: 6px; font-size: .88rem; }
-    .btn-connect:hover { background: #1d4ed8; }
-    .btn-logout { background: transparent; color: inherit; border: 1px solid #bbb;
+    .btn-connect:hover { background: var(--accent-hover); }
+    .btn-logout { background: transparent; color: var(--text); border: 1px solid var(--border);
                   padding: 6px 12px; font-size: .82rem; }
+    .btn-logout:hover { background: var(--surface-2); }
   </style>
 </head>
 <body>
