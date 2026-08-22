@@ -89,7 +89,7 @@ salesforce:
 ## 手順3: 接続する
 
 ```bash
-python src/app.py
+poetry run python src/app.py
 ```
 
 1. <http://localhost:8080> を開く

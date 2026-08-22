@@ -6,17 +6,48 @@ TeamSpirit（Salesforce上のマネージドパッケージ）の稟議書を、
 TeamSpirit環境は未入手のため、開発orgに作った稟議書モック `Ringi__c` で開発・検証している。
 本番へは **config のAPI名を差し替えるだけ**で移行できる設計。
 
+## セットアップ
+
+**pyenv + Poetry** で環境を管理している。Python のバージョンは [.python-version](.python-version)、
+依存パッケージは [pyproject.toml](pyproject.toml) / `poetry.lock` に固定されている。
+
+初回のみ（Python 3.12.10 が未インストールの場合）:
+
+```bash
+pyenv install 3.12.10
+```
+
+依存パッケージをインストール（`.venv/` がプロジェクト直下に作られる）:
+
+```bash
+poetry install
+```
+
+設定ファイルを用意する（`config.yaml` は機密を含むため git 管理外）:
+
+```bash
+cp config/config.example.yaml config/config.yaml
+```
+
 ## 使い方
 
 ```bash
-pip install -r requirements.txt
-```
-
-```bash
-python src/app.py
+poetry run python src/app.py
 ```
 
 ブラウザで <http://127.0.0.1:8080> を開く。
+
+> `poetry shell` を使うか `.venv/Scripts/activate` で仮想環境に入れば、
+> 以降は `python src/app.py` だけで起動できる。
+
+### 依存パッケージを追加するとき
+
+```bash
+poetry add <パッケージ名>
+```
+
+`pyproject.toml` と `poetry.lock` が自動更新される。`poetry.lock` は**コミットする**
+（全員が同じバージョンで動くようにするため）。
 
 ### 2つの検索モード
 

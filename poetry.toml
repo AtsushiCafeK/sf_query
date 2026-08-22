@@ -1,0 +1,3 @@
+# 仮想環境をプロジェクト直下の .venv に作る（他の開発者の環境でも同じ挙動にする）
+[virtualenvs]
+in-project = true
