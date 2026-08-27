@@ -1,0 +1,17 @@
+# 改行コードの扱いを固定する。
+# リポジトリ内は常に LF で保存し、チェックアウト時に各OSの流儀へ変換する。
+# これを置かないと core.autocrlf の設定差で、環境ごとに改行が食い違ったり
+# 「LF will be replaced by CRLF」の警告が出続けたりする。
+* text=auto eol=lf
+
+# Windows でのみ使うスクリプトは CRLF を保つ
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# バイナリは変換しない
+*.pdf binary
+*.zip binary
+*.png binary
+*.jpg binary
+*.ico binary

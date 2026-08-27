@@ -221,3 +221,6 @@ __marimo__/
 config/config.yaml
 .tokens.json
 .flask_secret
+
+# Claude Code のローカル作業ファイル（起動設定・権限設定）
+.claude/

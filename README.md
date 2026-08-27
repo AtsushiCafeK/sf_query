@@ -222,3 +222,4 @@ sf sobject describe --sobject <オブジェクトAPI名>
 - [開発org セットアップ手順](docs/02_dev_org_setup.md)
 - [SOQL / スキーマ探索 チートシート](docs/03_soql_cheatsheet.md)
 - [OAuth 2.0 接続設定（接続アプリの作成）](docs/04_oauth_setup.md)
+- [変更履歴（CHANGELOG）](CHANGELOG.md)
