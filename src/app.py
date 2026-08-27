@@ -17,6 +17,7 @@ from sf_client import get_connection, SalesforceError
 from query_builder import (
     build_ringi_query,
     get_filter_defs,
+    validate_config,
     validate_raw_soql,
     extract_object_name,
     QueryBuildError,
@@ -47,9 +48,29 @@ app.secret_key = _load_secret_key()
 _TOKEN_STORE: dict[str, dict] = {}
 
 
+class ConfigError(RuntimeError):
+    """config.yaml が読めない・内容が不正なときに送出する。"""
+
+
 def load_config() -> dict:
-    with open(CONFIG_PATH, encoding="utf-8") as fh:
-        return yaml.safe_load(fh)
+    """config.yaml を読む。書式ミスは原因が分かる形にして送出する。"""
+    try:
+        with open(CONFIG_PATH, encoding="utf-8") as fh:
+            return yaml.safe_load(fh)
+    except FileNotFoundError:
+        raise ConfigError(
+            f"設定ファイルが見つかりません: {CONFIG_PATH}\n"
+            "config/config.example.yaml をコピーして config/config.yaml を作成してください。"
+        ) from None
+    except yaml.YAMLError as exc:
+        # 行番号が分かると直す場所が特定できる
+        mark = getattr(exc, "problem_mark", None)
+        where = f"（{mark.line + 1} 行目付近）" if mark else ""
+        problem = getattr(exc, "problem", None) or str(exc)
+        raise ConfigError(
+            f"config.yaml の書式が正しくありません{where}: {problem}\n"
+            "インデント（半角スペース）のずれがないか確認してください。"
+        ) from None
 
 
 # ---------------------------------------------------------------------------
@@ -189,9 +210,26 @@ def _to_table(records: list[dict], counts: dict) -> tuple[list[str], list[dict]]
     return columns, rows
 
 
+def _config_error_page(message: str):
+    """設定が読めない場合でも、原因を伝える画面を返す（500にしない）。"""
+    empty = {"ringi": {"filters": []}, "salesforce": {}}
+    return render_template(
+        "index.html", config=empty, filters={}, mode="form",
+        raw_soql="", status=None, config_error=message,
+    )
+
+
 @app.route("/")
 def index():
-    config = load_config()
+    try:
+        config = load_config()
+    except ConfigError as exc:
+        return _config_error_page(str(exc))
+
+    problems = validate_config(config)
+    if problems:
+        return _config_error_page("\n".join(problems))
+
     default_soql = build_ringi_query(config)
     return render_template(
         "index.html", config=config, filters={}, mode="form",
@@ -242,7 +280,10 @@ def _run(config: dict, do_download: bool):
 @app.route("/oauth/login")
 def oauth_login():
     """PKCE を生成し、Salesforce の認可画面へリダイレクトする。"""
-    config = load_config()
+    try:
+        config = load_config()
+    except ConfigError as exc:
+        return _config_error_page(str(exc))
     try:
         verifier, challenge = oauth.generate_pkce()
         state = oauth.generate_state()
@@ -259,7 +300,10 @@ def oauth_login():
 @app.route("/oauth/callback")
 def oauth_callback():
     """認可コードを受け取り、トークンに交換して保存する。"""
-    config = load_config()
+    try:
+        config = load_config()
+    except ConfigError as exc:
+        return _config_error_page(str(exc))
     error = request.args.get("error")
     code = request.args.get("code")
     state = request.args.get("state")
@@ -297,7 +341,10 @@ def oauth_callback():
 @app.route("/oauth/logout", methods=["POST"])
 def oauth_logout():
     """トークンを失効させて切断する。"""
-    config = load_config()
+    try:
+        config = load_config()
+    except ConfigError as exc:
+        return _config_error_page(str(exc))
     tokens = _clear_tokens()
     if tokens and tokens.get("access_token"):
         oauth.revoke_token(config, tokens["access_token"])
@@ -306,12 +353,18 @@ def oauth_logout():
 
 @app.route("/search", methods=["POST"])
 def search():
-    return _run(load_config(), do_download=False)
+    try:
+        return _run(load_config(), do_download=False)
+    except ConfigError as exc:
+        return _config_error_page(str(exc))
 
 
 @app.route("/download", methods=["POST"])
 def download():
-    return _run(load_config(), do_download=True)
+    try:
+        return _run(load_config(), do_download=True)
+    except ConfigError as exc:
+        return _config_error_page(str(exc))
 
 
 if __name__ == "__main__":

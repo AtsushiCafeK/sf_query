@@ -131,6 +131,87 @@ def build_ringi_query(config: dict, filters: dict | None = None) -> str:
 
 
 # ---------------------------------------------------------------------------
+# 設定の検証（設定ミスを画面に出すため）
+# ---------------------------------------------------------------------------
+# 設定でよくある綴り間違いを拾うための、期待されるキー名
+_RINGI_KNOWN_KEYS = {
+    "object_api_name", "fields", "columns", "order_by", "filters", "attachment_type",
+}
+_FILTER_KNOWN_KEYS = {"name", "label", "type", "field", "operator", "options"}
+
+
+def validate_config(config: dict) -> list[str]:
+    """config を検証し、問題点のメッセージ一覧を返す（空なら問題なし）。
+
+    「500エラーになる」「エラーも出ずに黙って機能が消える」のどちらも避けるため、
+    致命的な誤りとタイプミスの疑いをまとめて拾い上げる。
+    """
+    problems: list[str] = []
+
+    if not isinstance(config, dict):
+        return ["config.yaml の内容を読み取れません（トップレベルが辞書ではありません）。"]
+
+    ringi = config.get("ringi")
+    if not isinstance(ringi, dict):
+        return ["config.yaml に `ringi:` セクションがありません。"]
+
+    # 綴り間違いの疑い（例: filters を filter と書いた場合、黙って検索欄が消える）
+    for key in ringi:
+        if key not in _RINGI_KNOWN_KEYS:
+            problems.append(
+                f"`ringi:` に見慣れない項目 `{key}` があります。"
+                f"綴り間違いではありませんか？（使える項目: {', '.join(sorted(_RINGI_KNOWN_KEYS))}）"
+            )
+
+    if not ringi.get("object_api_name"):
+        problems.append("`ringi.object_api_name` が設定されていません。")
+
+    filters = ringi.get("filters")
+    if filters is None:
+        problems.append(
+            "`ringi.filters` がありません。検索条件の入力欄が表示されません"
+            "（`filter` などと綴り間違いしていませんか？）。"
+        )
+    elif not isinstance(filters, list):
+        problems.append("`ringi.filters` はリスト（`- name: ...` の並び）で書いてください。")
+    else:
+        seen: set[str] = set()
+        for i, fdef in enumerate(filters, start=1):
+            where = f"`ringi.filters` の {i} 番目"
+            if not isinstance(fdef, dict):
+                problems.append(f"{where} の書き方が正しくありません。")
+                continue
+            for key in fdef:
+                if key not in _FILTER_KNOWN_KEYS:
+                    problems.append(
+                        f"{where} に見慣れない項目 `{key}` があります。綴り間違いではありませんか？"
+                        f"（使える項目: {', '.join(sorted(_FILTER_KNOWN_KEYS))}）"
+                    )
+            name = str(fdef.get("name") or "").strip()
+            if name in seen:
+                problems.append(f"{where}: name `{name}` が重複しています。")
+            seen.add(name)
+            if fdef.get("type") == "select" and not fdef.get("options"):
+                problems.append(
+                    f"{where}（{name or '名前未設定'}）: type が select なのに options がありません。"
+                )
+            try:
+                _parse_def(fdef)  # 型・演算子・項目名の妥当性
+            except QueryBuildError as exc:
+                problems.append(f"{where}: {exc}")
+
+    # 実際に SOQL を組めるところまで通す（columns / order_by の誤りもここで出る）
+    try:
+        build_ringi_query(config)
+    except QueryBuildError as exc:
+        problems.append(str(exc))
+    except KeyError as exc:
+        problems.append(f"`ringi` に必要な設定がありません: {exc}")
+
+    return problems
+
+
+# ---------------------------------------------------------------------------
 # SOQL 直接入力モード
 # ---------------------------------------------------------------------------
 _FORBIDDEN = re.compile(
