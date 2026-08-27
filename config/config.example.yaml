@@ -14,6 +14,18 @@ salesforce:
   login_url: "https://login.salesforce.com"
   api_version: "60.0"
 
+  # 認証バックエンド:
+  #   "oauth" … OAuth 2.0 認可コードフロー + PKCE（既定・本番向け）。
+  #             画面右上の「Salesforceに接続」から各利用者が自分のアカウントで
+  #             ログインする。下の oauth.client_id の設定が必要。
+  #             接続アプリの作成手順は docs/04_oauth_setup.md を参照。
+  #   "cli"   … sf CLI パススルー。接続アプリ不要で開発時にすぐ試せるが、
+  #             Salesforce CLI のインストールとログインが必要。
+  auth_mode: "oauth"
+
+  # auth_mode=cli のとき使う sf の org 別名（`sf org list` の alias）
+  cli_target_org: "my-dev-org"
+
   oauth:
     # 接続アプリの Consumer Key
     client_id: "<CONNECTED_APP_CONSUMER_KEY>"
