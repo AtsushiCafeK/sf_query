@@ -116,6 +116,7 @@
       ✔ ダウンロード完了：{{ download_summary.count }} ファイル
       （対象 {{ download_summary.records_total }} 件中、添付あり {{ download_summary.records_with_attachment }} 件）<br>
       保存先：<code>{{ download_summary.output_dir }}</code>
+      {% if download_summary.manifest %}<br>一覧表：<code>{{ download_summary.manifest }}</code>{% endif %}
       {% if download_summary.zip %}<br>ZIP：<code>{{ download_summary.zip }}</code>{% endif %}
     </div>
   {% endif %}
