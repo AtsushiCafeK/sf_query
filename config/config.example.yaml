@@ -33,33 +33,83 @@ salesforce:
 #   開発org（モック）→ 本番TeamSpirit は、ここの *_api_name を差し替える。
 # ---------------------------------------------------------------------
 ringi:
-  # 開発org: "Ringi__c" / 本番: 例 "teamspirit__XXXX__c"
   object_api_name: "Ringi__c"
 
+  # ダウンローダが使う項目マッピング（一覧表CSVの列・フォルダ名など）
   fields:
-    title: "Name"                        # 件名
-    status: "Status__c"                  # ステータス（絞り込み）
-    application_date: "ApplicationDate__c"  # 申請日（期間絞り込み）
-    amount: "Amount__c"                  # 任意
-    applicant: "Applicant__c"            # 任意
+    title: "Name"
+    status: "Status__c"
+    application_date: "ApplicationDate__c"
+    amount: "Amount__c"
+    applicant: "Applicant__c"
 
-  # レコードの種類（絞り込み）: DeveloperName で一致させる
-  record_type_developer_name_field: "RecordType.DeveloperName"
+  # 検索結果に表示する列（＝SOQLのSELECT句）。Id は自動で付与される。
+  columns:
+    - "Name"
+    - "Status__c"
+    - "ApplicationDate__c"
+    - "RecordType.DeveloperName"
 
-  # UIプルダウンに出すレコードの種類。value=SOQLで使うDeveloperName / label=画面表示
-  record_types:
-    - { value: "Purchase", label: "購買稟議" }
-    - { value: "Contract", label: "契約稟議" }
-    - { value: "Payment",  label: "支払稟議" }
+  # 並び順（＝SOQLのORDER BY）。この順に 001, 002 … の連番が振られる。
+  order_by: "ApplicationDate__c DESC NULLS LAST"
 
-  # UIプルダウンに出すステータス。value=保存値 / label=画面表示
-  statuses:
-    - { value: "Submitted", label: "申請中" }
-    - { value: "Approved",  label: "承認済" }
-    - { value: "Rejected",  label: "却下" }
-    - { value: "Returned",  label: "差戻し" }
+  # ---------------------------------------------------------------
+  # 検索フォームのフィルタ定義
+  #
+  # ★ここにブロックを1つ足すだけで、画面の入力欄と検索条件の両方が増える。
+  #   Pythonコード・HTMLの変更は不要。
+  #
+  #   name     : フォームの項目名（英数字とアンダースコアのみ）
+  #   label    : 画面に表示する名前
+  #   type     : select（プルダウン） / date（カレンダー） / number（数値）
+  #   field    : 検索対象のSOQL項目名
+  #   operator : eq(=) ne(!=) gt(>) gte(>=) lt(<) lte(<=)
+  #   options  : type=select のときの選択肢（value=保存値 / label=表示名）
+  #
+  #   同じ field に gte と lte の2つを定義すれば「範囲」検索になる（下記の申請日）。
+  # ---------------------------------------------------------------
+  filters:
+    - name: record_type
+      label: "レコードの種類"
+      type: select
+      field: "RecordType.DeveloperName"
+      operator: eq
+      options:
+        - { value: "Purchase", label: "購買稟議" }
+        - { value: "Contract", label: "契約稟議" }
+        - { value: "Payment",  label: "支払稟議" }
 
-  # 添付方式: "files"(ContentDocument/Salesforce Files) または "attachment"(旧Attachment)
+    # 開発orgの実際の選択リスト値に合わせている（describeで確認済み）。
+    # 本番TeamSpiritでは実値に差し替える。
+    - name: status
+      label: "ステータス"
+      type: select
+      field: "Status__c"
+      operator: eq
+      options:
+        - { value: "Submitted", label: "申請中" }
+        - { value: "Agree",     label: "承認" }
+        - { value: "Done",      label: "完了" }
+
+    - name: date_from
+      label: "申請日（開始）"
+      type: date
+      field: "ApplicationDate__c"
+      operator: gte
+
+    - name: date_to
+      label: "申請日（終了）"
+      type: date
+      field: "ApplicationDate__c"
+      operator: lte
+
+    # 追加例（コメントを外すとそのまま使える）
+    # - name: amount_min
+    #   label: "金額（以上）"
+    #   type: number
+    #   field: "Amount__c"
+    #   operator: gte
+
   attachment_type: "files"
 
 # ---------------------------------------------------------------------

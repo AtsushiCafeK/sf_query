@@ -83,6 +83,43 @@ ZIPにまとめられる。
 レコードID・ファイル名を一覧順で書き出すので、印刷物のチェックリストに使える
 （Excelで開けるようBOM付きUTF-8）。添付が無いレコードも「添付なし」として行に残る。
 
+## 検索条件（フィルタ）の追加・変更 ― 管理者向け
+
+画面のプルダウン・カレンダー・数値入力は [config/config.yaml](config/config.yaml) の
+`ringi.filters` に**宣言**として書く。**config を編集するだけ**で画面の入力欄と検索条件の
+両方が増える（Python・HTML の変更は不要）。
+
+```yaml
+ringi:
+  filters:
+    - name: amount_min          # フォームの項目名
+      label: "金額（以上）"      # 画面の表示名
+      type: number              # select / date / number
+      field: "Amount__c"        # 検索対象のSOQL項目
+      operator: gte             # eq ne gt gte lt lte
+```
+
+| type | 画面 | 用途 |
+|---|---|---|
+| `select` | プルダウン | `options:` に `value`(保存値) / `label`(表示名) を列挙 |
+| `date` | カレンダー | 同じ `field` に `gte` と `lte` を2つ定義すれば期間指定になる |
+| `number` | 数値入力 | 金額の下限・上限など |
+
+表示する列は `ringi.columns`、並び順は `ringi.order_by` で変更する
+（並び順はダウンロード時の連番の順序にもそのまま反映される）。
+
+### 安全性について
+
+利用者の入力は型ごとに検証してからSOQLに渡す。自由文字列がそのまま条件に入る経路は作っていない。
+
+- `select` … config の `options` に**完全一致**する値のみ受け付ける
+- `date` … `YYYY-MM-DD` 形式のみ
+- `number` … 数値形式のみ
+- `field` / `columns` / `order_by` … 識別子として妥当な形式かを検証（configの書き間違い対策）
+- `operator` … 許可リスト（`eq` `ne` `gt` `gte` `lt` `lte`）からのみ
+
+自由文字列で検索したいときは「SOQLを直接入力」タブを使う。
+
 ## アーキテクチャ
 
 ```

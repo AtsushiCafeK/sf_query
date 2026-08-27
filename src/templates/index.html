@@ -136,32 +136,27 @@
     <!-- モード1: プルダウンで条件選択 -->
     <div id="pane-form" style="{% if active != 'form' %}display:none;{% endif %}">
       <div class="grid">
-        <div class="field">
-          <label>レコードの種類</label>
-          <select name="record_type">
-            <option value="">（指定なし）</option>
-            {% for rt in config.ringi.record_types %}
-              <option value="{{ rt.value }}" {% if filters.record_type == rt.value %}selected{% endif %}>{{ rt.label }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="field">
-          <label>ステータス</label>
-          <select name="status">
-            <option value="">（指定なし）</option>
-            {% for st in config.ringi.statuses %}
-              <option value="{{ st.value }}" {% if filters.status == st.value %}selected{% endif %}>{{ st.label }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="field">
-          <label>申請日（開始）</label>
-          <input type="date" name="date_from" value="{{ filters.date_from or '' }}">
-        </div>
-        <div class="field">
-          <label>申請日（終了）</label>
-          <input type="date" name="date_to" value="{{ filters.date_to or '' }}">
-        </div>
+        {# config の ringi.filters を回して描画する。フィルタ追加時にHTML変更は不要 #}
+        {% for f in config.ringi.filters %}
+          <div class="field">
+            <label for="f_{{ f.name }}">{{ f.label }}</label>
+            {% if f.type == 'select' %}
+              <select id="f_{{ f.name }}" name="{{ f.name }}">
+                <option value="">（指定なし）</option>
+                {% for o in f.options %}
+                  <option value="{{ o.value }}"
+                    {% if filters.get(f.name) == o.value|string %}selected{% endif %}>{{ o.label }}</option>
+                {% endfor %}
+              </select>
+            {% elif f.type == 'date' %}
+              <input id="f_{{ f.name }}" type="date" name="{{ f.name }}"
+                     value="{{ filters.get(f.name) or '' }}">
+            {% elif f.type == 'number' %}
+              <input id="f_{{ f.name }}" type="number" step="any" name="{{ f.name }}"
+                     value="{{ filters.get(f.name) or '' }}">
+            {% endif %}
+          </div>
+        {% endfor %}
       </div>
     </div>
 
@@ -188,10 +183,9 @@
         {% if results|length > 0 %}
           <form method="post" action="/download" style="margin:0;">
             <input type="hidden" name="mode" value="{{ active }}">
-            <input type="hidden" name="record_type" value="{{ filters.record_type or '' }}">
-            <input type="hidden" name="status" value="{{ filters.status or '' }}">
-            <input type="hidden" name="date_from" value="{{ filters.date_from or '' }}">
-            <input type="hidden" name="date_to" value="{{ filters.date_to or '' }}">
+            {% for f in config.ringi.filters %}
+              <input type="hidden" name="{{ f.name }}" value="{{ filters.get(f.name) or '' }}">
+            {% endfor %}
             <input type="hidden" name="raw_soql" value="{{ raw_soql or '' }}">
             <button type="submit" class="btn-download">添付ファイルを一括ダウンロード</button>
           </form>

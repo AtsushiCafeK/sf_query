@@ -16,6 +16,7 @@ import oauth
 from sf_client import get_connection, SalesforceError
 from query_builder import (
     build_ringi_query,
+    get_filter_defs,
     validate_raw_soql,
     extract_object_name,
     QueryBuildError,
@@ -117,24 +118,26 @@ def _connection_status(config: dict) -> dict:
     return {"connected": False, "via": None, "user": None, "org": ""}
 
 
-def _read_filters(form) -> dict:
-    def clean(value):
-        value = (value or "").strip()
-        return value or None
+def _read_filters(config: dict, form) -> dict:
+    """config に宣言されたフィルタ名だけをフォームから読む。
 
-    return {
-        "record_type": clean(form.get("record_type")),
-        "status": clean(form.get("status")),
-        "date_from": clean(form.get("date_from")),
-        "date_to": clean(form.get("date_to")),
-    }
+    フィルタを増やしてもここは変更不要（config の定義に自動で追随する）。
+    """
+    filters: dict = {}
+    for fdef in get_filter_defs(config):
+        name = str(fdef.get("name") or "").strip()
+        if not name:
+            continue
+        value = (form.get(name) or "").strip()
+        filters[name] = value or None
+    return filters
 
 
 def _build_soql(config: dict, mode: str, filters: dict, raw_soql: str | None) -> str:
     """モードに応じて SOQL を用意する。"""
     if mode == "soql":
         return validate_raw_soql(raw_soql)
-    return build_ringi_query(config, **filters)
+    return build_ringi_query(config, filters)
 
 
 def _get_path(record: dict, dotted: str):
@@ -199,7 +202,7 @@ def index():
 def _run(config: dict, do_download: bool):
     """検索（＋任意でダウンロード）を実行し、テンプレートを描画する。"""
     mode = request.form.get("mode") or "form"
-    filters = _read_filters(request.form)
+    filters = _read_filters(config, request.form)
     raw_soql = request.form.get("raw_soql") or ""
 
     ctx = {
