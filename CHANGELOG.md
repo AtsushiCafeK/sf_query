@@ -4,7 +4,11 @@
 書式は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に、
 バージョン番号は [セマンティック バージョニング](https://semver.org/lang/ja/) に従う。
 
-## [1.2.0] - 2026-09-01
+## [1.2.0-beta.1] - 2026-09-01
+
+> ベータ版。旧Attachment形式（`attachment_type: "attachment"`）は実データでの検証が
+> 未了のため、安定版とは分けて公開している。職場環境での検証後に 1.2.0 として出す。
+
 
 「設定の変更だけで対応できる」範囲を実際に検証したところ、3つの穴が見つかったため
 修正し、あわせて自動テストを整備した。
@@ -80,7 +84,7 @@ OAuth 2.0 での接続と TeamSpirit 本番環境での動作を確認し、正�
 - UIをダークモード専用に統一（全要素で WCAG AA 4.5:1 以上）
 - pyenv + Poetry による環境管理
 
-[1.2.0]: https://github.com/AtsushiCafeK/sf_query/releases/tag/v1.2.0
+[1.2.0-beta.1]: https://github.com/AtsushiCafeK/sf_query/releases/tag/v1.2.0-beta.1
 [1.1.0]: https://github.com/AtsushiCafeK/sf_query/releases/tag/v1.1.0
 [1.0.0]: https://github.com/AtsushiCafeK/sf_query/releases/tag/v1.0.0
 [0.9.0]: https://github.com/AtsushiCafeK/sf_query/releases/tag/v0.9.0
