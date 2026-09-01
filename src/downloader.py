@@ -63,10 +63,73 @@ def fetch_latest_versions(conn, content_document_ids) -> dict[str, dict]:
     return versions
 
 
-def attachment_counts(conn, record_ids: list[str]) -> dict[str, int]:
-    """一覧表示用: record_id -> 添付件数"""
+def _attachment_type(config: dict) -> str:
+    """添付の保存形式。files=Salesforce Files / attachment=旧Attachment。"""
+    value = str(config.get("ringi", {}).get("attachment_type") or "files").strip().lower()
+    if value not in ("files", "attachment"):
+        raise ValueError(
+            f"ringi.attachment_type が不正です: {value}（使えるのは files, attachment）"
+        )
+    return value
+
+
+def fetch_attachments(conn, record_ids: list[str]) -> dict[str, list[dict]]:
+    """旧Attachment形式: record_id -> [{id, title, ext}] を返す。
+
+    Attachment.Name は拡張子込み（例 "請求書.pdf"）なので分解して扱う。
+    """
+    result: dict[str, list[dict]] = {}
+    if not record_ids:
+        return result
+    for batch in _chunked(list(record_ids), _IN_BATCH):
+        soql = (
+            "SELECT Id, Name, ParentId FROM Attachment "
+            f"WHERE ParentId IN ({_id_in_list(batch)})"
+        )
+        for row in conn.query(soql):
+            name = row.get("Name") or row["Id"]
+            stem, dot_ext = os.path.splitext(name)
+            result.setdefault(row["ParentId"], []).append({
+                "id": row["Id"],
+                "title": stem or name,
+                "ext": dot_ext.lstrip("."),
+            })
+    return result
+
+
+def collect_files(conn, config: dict, record_ids: list[str]) -> dict[str, list[dict]]:
+    """設定の attachment_type に応じて record_id -> 添付ファイル一覧 を返す。
+
+    戻り値の各要素は {id, title, ext, sobject, blob_field} で、
+    そのままバイナリ取得に使える形にそろえる。
+    """
+    if _attachment_type(config) == "attachment":
+        found = fetch_attachments(conn, record_ids)
+        return {
+            rid: [{**f, "sobject": "Attachment", "blob_field": "Body"} for f in files]
+            for rid, files in found.items()
+        }
+
+    # Salesforce Files: レコード → ContentDocumentLink → 最新 ContentVersion
     links = fetch_links(conn, record_ids)
-    return {rid: len(docs) for rid, docs in links.items()}
+    all_doc_ids = {doc for docs in links.values() for doc in docs}
+    versions = fetch_latest_versions(conn, all_doc_ids)
+    result: dict[str, list[dict]] = {}
+    for rid, doc_ids in links.items():
+        files = []
+        for doc_id in doc_ids:
+            ver = versions.get(doc_id)
+            if ver:
+                files.append({**ver, "sobject": "ContentVersion",
+                              "blob_field": "VersionData"})
+        if files:
+            result[rid] = files
+    return result
+
+
+def attachment_counts(conn, config: dict, record_ids: list[str]) -> dict[str, int]:
+    """一覧表示用: record_id -> 添付件数（設定の形式に追随する）"""
+    return {rid: len(files) for rid, files in collect_files(conn, config, record_ids).items()}
 
 
 def _seq_width(total: int) -> int:
@@ -92,15 +155,13 @@ def download_for_records(conn, config: dict, records: list[dict]) -> dict:
     make_zip = dl_cfg.get("zip", True)
     make_manifest = dl_cfg.get("manifest", True)
 
-    fields = config["ringi"]["fields"]
-    title_field = fields["title"]
+    fields = config["ringi"].get("fields") or {}
+    title_field = fields.get("title")
     status_field = fields.get("status")
     date_field = fields.get("application_date")
 
     record_ids = [r["Id"] for r in records]
-    links = fetch_links(conn, record_ids)
-    all_doc_ids = {doc for docs in links.values() for doc in docs}
-    versions = fetch_latest_versions(conn, all_doc_ids)
+    files_by_record = collect_files(conn, config, record_ids)
 
     os.makedirs(out_dir, exist_ok=True)
     width = _seq_width(len(records))
@@ -111,18 +172,19 @@ def download_for_records(conn, config: dict, records: list[dict]) -> dict:
     for idx, rec in enumerate(records, start=1):
         rid = rec["Id"]
         seq = str(idx).zfill(width)
-        title = rec.get(title_field) or rid
-        doc_ids = links.get(rid, [])
+        rec_title = rec.get(title_field) if title_field else None
+        title = rec_title or rid
+        files = files_by_record.get(rid, [])
 
         row_base = {
             "連番": seq,
-            "件名": rec.get(title_field) or "",
+            "件名": rec_title or "",
             "申請日": (rec.get(date_field) or "") if date_field else "",
             "ステータス": (rec.get(status_field) or "") if status_field else "",
             "レコードID": rid,
         }
 
-        if not doc_ids:
+        if not files:
             skipped_no_attachment += 1
             manifest_rows.append({**row_base, "枝番": "", "ファイル名": "",
                                   "保存パス": "", "備考": "添付なし"})
@@ -137,10 +199,7 @@ def download_for_records(conn, config: dict, records: list[dict]) -> dict:
 
         used_names: dict[str, int] = {}
         branch = 0
-        for doc_id in doc_ids:
-            ver = versions.get(doc_id)
-            if not ver:
-                continue
+        for ver in files:
             branch += 1
             base = _safe_name(ver["title"])
             ext = ver["ext"]
@@ -157,7 +216,7 @@ def download_for_records(conn, config: dict, records: list[dict]) -> dict:
                 used_names[key] = 0
 
             dest = os.path.join(target_dir, fname)
-            conn.download_blob(ver["id"], dest)
+            conn.download_blob(ver["sobject"], ver["id"], ver["blob_field"], dest)
             downloaded.append(dest)
             manifest_rows.append({**row_base, "枝番": str(branch), "ファイル名": fname,
                                   "保存パス": os.path.relpath(dest, out_dir), "備考": ""})

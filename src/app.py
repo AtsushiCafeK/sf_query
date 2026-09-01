@@ -18,6 +18,7 @@ from query_builder import (
     build_ringi_query,
     get_filter_defs,
     validate_config,
+    check_config_warnings,
     validate_raw_soql,
     extract_object_name,
     QueryBuildError,
@@ -234,6 +235,7 @@ def index():
     return render_template(
         "index.html", config=config, filters={}, mode="form",
         raw_soql=default_soql, status=_connection_status(config),
+        config_warnings=check_config_warnings(config),
     )
 
 
@@ -246,13 +248,14 @@ def _run(config: dict, do_download: bool):
     ctx = {
         "config": config, "filters": filters, "mode": mode, "raw_soql": raw_soql,
         "status": _connection_status(config),
+        "config_warnings": check_config_warnings(config),
     }
 
     try:
         soql = _build_soql(config, mode, filters, raw_soql)
         conn = _connect(config)
         records = conn.query(soql)
-        counts = downloader.attachment_counts(conn, [r["Id"] for r in records])
+        counts = downloader.attachment_counts(conn, config, [r["Id"] for r in records])
         summary = (
             downloader.download_for_records(conn, config, records) if do_download else None
         )

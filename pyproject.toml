@@ -1,6 +1,6 @@
 [project]
 name = "ringi-attachment-downloader"
-version = "1.1.0"
+version = "1.2.0"
 description = "稟議書を種類・期間・ステータスで絞り込み、添付ファイルを一括ダウンロードするツール"
 requires-python = ">=3.12,<3.13"
 dependencies = [
@@ -13,3 +13,10 @@ dependencies = [
 # アプリケーション（配布ライブラリではない）ため、パッケージ化はしない。
 # src/ 配下のモジュールは `poetry run python src/app.py` で直接実行する。
 package-mode = false
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

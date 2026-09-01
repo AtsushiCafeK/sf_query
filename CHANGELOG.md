@@ -4,6 +4,29 @@
 書式は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に、
 バージョン番号は [セマンティック バージョニング](https://semver.org/lang/ja/) に従う。
 
+## [1.2.0] - 2026-09-01
+
+「設定の変更だけで対応できる」範囲を実際に検証したところ、3つの穴が見つかったため
+修正し、あわせて自動テストを整備した。
+
+### 修正
+- `ringi.fields.title` の綴り間違いが検証をすり抜け、**ダウンロード時に HTTP 500**
+  になっていた。設定検証で検出するようにした
+- **`ringi.attachment_type` が実装から一度も参照されておらず、設定を変えても無視されていた**。
+  旧Attachment形式（`Attachment` / `Body`）の取得経路を実装し、設定で切り替わるようにした
+  （※旧形式は実データでの検証が未了。0件になる場合は `files` に戻す）
+
+### 追加
+- 動作は止まらないが意図しない結果になりうる設定を、**警告**として画面に表示
+  （件名が `columns` に無くフォルダ名がIDだけになる場合、旧Attachment形式を選んだ場合）
+- **pytest による自動テスト（58件）**。Salesforceに接続せず実行できる。
+  SOQL組み立て、インジェクション拒否、設定の検証と警告、連番付与と並び順、
+  フォルダ分け／平置き、一覧表CSV、添付形式の切り替えを網羅。
+  テストは `config.example.yaml` を土台にするため、配布している設定例の妥当性も同時に検証される
+
+### 変更
+- `sf_client.download_blob` を任意のオブジェクト/バイナリ項目に対応する形に一般化
+
 ## [1.1.0] - 2026-08-27
 
 ### 追加
@@ -57,6 +80,7 @@ OAuth 2.0 での接続と TeamSpirit 本番環境での動作を確認し、正�
 - UIをダークモード専用に統一（全要素で WCAG AA 4.5:1 以上）
 - pyenv + Poetry による環境管理
 
+[1.2.0]: https://github.com/AtsushiCafeK/sf_query/releases/tag/v1.2.0
 [1.1.0]: https://github.com/AtsushiCafeK/sf_query/releases/tag/v1.1.0
 [1.0.0]: https://github.com/AtsushiCafeK/sf_query/releases/tag/v1.0.0
 [0.9.0]: https://github.com/AtsushiCafeK/sf_query/releases/tag/v0.9.0

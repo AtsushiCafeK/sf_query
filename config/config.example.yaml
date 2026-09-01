@@ -122,6 +122,10 @@ ringi:
     #   field: "Amount__c"
     #   operator: gte
 
+  # 添付の保存形式:
+  #   "files"      … Salesforce Files（ContentDocument系）。通常はこちら
+  #   "attachment" … 旧「添付ファイル（Attachment）」形式
+  # ※ "attachment" は実データでの検証が済んでいない。0件になる場合は files を試す。
   attachment_type: "files"
 
 # ---------------------------------------------------------------------

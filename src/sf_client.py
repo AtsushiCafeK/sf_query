@@ -116,9 +116,15 @@ class SfCliConnection:
             path = data.get("nextRecordsUrl")  # 相対パス。そのまま次リクエストへ
         return records
 
-    def download_blob(self, content_version_id: str, dest_path: str) -> str:
-        path = f"/services/data/v{self.api_version}/sobjects/ContentVersion/{content_version_id}/VersionData"
-        # VersionData は特殊文字を含まない安全なパス。--stream-to-file でバイナリ保存
+    def download_blob(self, sobject: str, record_id: str, blob_field: str,
+                      dest_path: str) -> str:
+        """任意のオブジェクトのバイナリ項目を保存する。
+
+        Files は ContentVersion/VersionData、旧Attachment は Attachment/Body。
+        """
+        path = (f"/services/data/v{self.api_version}/sobjects/"
+                f"{sobject}/{record_id}/{blob_field}")
+        # ID・項目名は英数字のみで特殊文字を含まない。--stream-to-file でバイナリ保存
         self._run_sf(["api", "request", "rest", path, "--stream-to-file", os.path.abspath(dest_path)])
         return dest_path
 
@@ -178,12 +184,14 @@ class TokenConnection:
             url = f"{self.instance_url}{next_url}" if next_url else None
         return records
 
-    def download_blob(self, content_version_id: str, dest_path: str) -> str:
-        url = self._data_url(f"sobjects/ContentVersion/{content_version_id}/VersionData")
+    def download_blob(self, sobject: str, record_id: str, blob_field: str,
+                      dest_path: str) -> str:
+        """任意のオブジェクトのバイナリ項目を保存する。"""
+        url = self._data_url(f"sobjects/{sobject}/{record_id}/{blob_field}")
         with self._get(url, stream=True, timeout=300) as resp:
             if not resp.ok:
                 raise SalesforceError(
-                    f"ファイル取得失敗 ({resp.status_code}) id={content_version_id}: {resp.text[:200]}"
+                    f"ファイル取得失敗 ({resp.status_code}) id={record_id}: {resp.text[:200]}"
                 )
             with open(dest_path, "wb") as fh:
                 for chunk in resp.iter_content(chunk_size=8192):

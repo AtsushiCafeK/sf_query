@@ -166,6 +166,31 @@ def validate_config(config: dict) -> list[str]:
     if not ringi.get("object_api_name"):
         problems.append("`ringi.object_api_name` が設定されていません。")
 
+    # fields は downloader がフォルダ名・一覧表に使う。title の欠落は実行時エラーになる。
+    fields = ringi.get("fields")
+    if not isinstance(fields, dict):
+        problems.append("`ringi.fields` がありません（`title` の指定が必要です）。")
+    else:
+        if not fields.get("title"):
+            problems.append(
+                "`ringi.fields.title` が設定されていません。"
+                "（`titel` などと綴り間違いしていませんか？）"
+                "ダウンロード時にエラーになります。"
+            )
+        for key, value in fields.items():
+            if value:
+                try:
+                    _check_identifier(value, f"`ringi.fields.{key}` の項目名")
+                except QueryBuildError as exc:
+                    problems.append(str(exc))
+
+    attach = str(ringi.get("attachment_type") or "files").strip().lower()
+    if attach not in ("files", "attachment"):
+        problems.append(
+            f"`ringi.attachment_type` が不正です: {ringi.get('attachment_type')}"
+            "（使えるのは files, attachment）"
+        )
+
     filters = ringi.get("filters")
     if filters is None:
         problems.append(
@@ -209,6 +234,35 @@ def validate_config(config: dict) -> list[str]:
         problems.append(f"`ringi` に必要な設定がありません: {exc}")
 
     return problems
+
+
+def check_config_warnings(config: dict) -> list[str]:
+    """動作は止まらないが、意図しない結果になりうる設定を知らせる。
+
+    エラーにせず画面に注意として出す。設定変更のたびに気づけるようにするため。
+    """
+    warnings: list[str] = []
+    ringi = config.get("ringi")
+    if not isinstance(ringi, dict):
+        return warnings
+
+    fields = ringi.get("fields") or {}
+    title = fields.get("title")
+    columns = ringi.get("columns") or []
+    if title and columns and title not in columns:
+        warnings.append(
+            f"件名の項目 `{title}` が `ringi.columns` に含まれていません。"
+            "ダウンロード時のフォルダ名がレコードIDだけになり、"
+            "一覧表(CSV)の件名も空になります。"
+        )
+
+    if str(ringi.get("attachment_type") or "files").lower() == "attachment":
+        warnings.append(
+            "`ringi.attachment_type` が `attachment`（旧Attachment形式）です。"
+            "この経路は実データでの検証が済んでいません。"
+            "取得件数が0件になる場合は `files` を試してください。"
+        )
+    return warnings
 
 
 # ---------------------------------------------------------------------------

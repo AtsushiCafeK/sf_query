@@ -4,7 +4,8 @@ TeamSpirit（Salesforce上のマネージドパッケージ）の稟議書を、
 紐づく添付ファイルを一括ダウンロードするツール。ローカルWeb UIで条件を選ぶだけで実行できる。
 
 オブジェクト名・項目名をコードにベタ書きせず config に外出ししているため、
-**接続先の切り替えは config のAPI名を差し替えるだけ**で済む。
+**接続先の切り替え・検索条件の追加は config の変更だけ**で済む
+（対象範囲は「検索条件（フィルタ）の追加・変更」の節を参照）。
 開発時は開発orgのモック（`Ringi__c`）、本番は TeamSpirit を同じコードで扱える
 （TeamSpirit 本番環境での動作を確認済み）。
 
@@ -50,6 +51,21 @@ poetry add <パッケージ名>
 
 `pyproject.toml` と `poetry.lock` が自動更新される。`poetry.lock` は**コミットする**
 （全員が同じバージョンで動くようにするため）。
+
+### テスト
+
+設定を変えても壊れないことを機械的に確かめる。**Salesforceに接続せずに実行できる**
+（偽の接続を使うため、何度でも回せる）。
+
+```bash
+poetry run pytest
+```
+
+守っている範囲: SOQLの組み立て、インジェクション拒否、設定の検証と警告、
+連番付与と並び順、フォルダ分け／平置き、一覧表CSV（BOM・添付なし行）、
+添付形式（Files／旧Attachment）の切り替え。
+テストの設定は `config/config.example.yaml` を土台にしているため、
+**配布している設定例がそのまま動くこと**も同時に検証される。
 
 ### 2つの検索モード
 
@@ -189,10 +205,18 @@ SOAP API（ユーザー名＋パスワード＋セキュリティトークン方
 ringi:
   object_api_name: "Ringi__c"        # → 例 "teamspirit__XXXX__c"
   fields:
-    status: "Status__c"              # → TeamSpiritの実項目名
+    title: "Name"                    # → TeamSpiritの実項目名
+    status: "Status__c"
     application_date: "ApplicationDate__c"
-  statuses:                          # → TeamSpiritの実際の選択リスト値
-    - { value: "Submitted", label: "申請中" }
+  columns: ["Name", "Status__c"]     # → 一覧に出す実項目名
+  filters:
+    - name: status
+      label: "ステータス"
+      type: select
+      field: "Status__c"             # → TeamSpiritの実項目名
+      operator: eq
+      options:                       # → TeamSpiritの実際の選択リスト値
+        - { value: "Submitted", label: "申請中" }
 ```
 
 実API名の調べ方（接続後）:
