@@ -3,9 +3,9 @@
 TeamSpirit（Salesforce上のマネージドパッケージ）の稟議書を、**レコードの種類・期間・ステータス**で絞り込み、
 紐づく添付ファイルを一括ダウンロードするツール。ローカルWeb UIで条件を選ぶだけで実行できる。
 
-オブジェクト名・項目名をコードにベタ書きせず config に外出ししているため、
-**接続先の切り替え・検索条件の追加は config の変更だけ**で済む
-（対象範囲は「検索条件（フィルタ）の追加・変更」の節を参照）。
+設定は**ブラウザの設定画面から変更できる**ため、YAMLを編集できなくても運用できる。
+オブジェクト名・項目名をコードにベタ書きしていないため、
+**接続先の切り替え・検索条件の追加にコード変更は不要**。
 開発時は開発orgのモック（`Ringi__c`）、本番は TeamSpirit を同じコードで扱える
 （TeamSpirit 本番環境での動作を確認済み）。
 
@@ -101,11 +101,28 @@ ZIPにまとめられる。
 レコードID・ファイル名を一覧順で書き出すので、印刷物のチェックリストに使える
 （Excelで開けるようBOM付きUTF-8）。添付が無いレコードも「添付なし」として行に残る。
 
-## 検索条件（フィルタ）の追加・変更 ― 管理者向け
+## 設定の変更 ― 管理者向け
 
-画面のプルダウン・カレンダー・数値入力は [config/config.yaml](config/config.yaml) の
-`ringi.filters` に**宣言**として書く。**config を編集するだけ**で画面の入力欄と検索条件の
-両方が増える（Python・HTML の変更は不要）。
+### 設定画面（推奨）
+
+画面左上の **⚙ 設定** から、接続情報・対象オブジェクト・表示項目・検索条件・
+ダウンロード設定をすべて変更できる。**YAMLを編集する必要はない。**
+
+項目名や選択リストの値は **Salesforceから読み込んでプルダウンに並ぶ**ため、
+`bunrui__c` のようなAPI名を調べて打ち込む作業が要らない。検索条件を追加するときは
+項目を選ぶだけで、入力の種類（プルダウン／カレンダー／数値）と選択肢が自動で入る。
+
+- **保存前に内容を検証**し、問題があれば**保存せずに理由を表示**する
+- **保存のたびに自動バックアップ**され、画面から前の状態に戻せる
+- 鍵は画面に表示せず、入力欄を空にすれば変更されない
+
+操作手順は 👉 [設定ガイド（管理者向け）](docs/05_settings_guide.md)
+
+### 設定ファイルを直接編集する場合
+
+[config/config.yaml](config/config.yaml) の `ringi.filters` に**宣言**として書く。
+**config を編集するだけ**で画面の入力欄と検索条件の両方が増える
+（Python・HTML の変更は不要）。設定画面と併用できる。
 
 ```yaml
 ringi:
@@ -174,6 +191,9 @@ ringi:
 | [src/query_builder.py](src/query_builder.py) | config駆動のSOQL組み立て＋直接入力SOQLの検証 |
 | [src/downloader.py](src/downloader.py) | 添付の特定・ダウンロード・ZIP化 |
 | [src/app.py](src/app.py) | Flaskルーティング（`/` `/search` `/download`） |
+| [src/config_store.py](src/config_store.py) | 設定の保存・バックアップ・復元（コメントを保持） |
+| [src/settings_form.py](src/settings_form.py) | 設定画面の入力を config へ反映 |
+| [src/schema.py](src/schema.py) | Salesforceの項目・選択肢を取得（設定画面のプルダウン用） |
 | [config/config.yaml](config/config.yaml) | **API名マッピング**（本番切替の要）・認証設定 |
 
 ## 認証について
@@ -238,7 +258,8 @@ sf sobject describe --sobject <オブジェクトAPI名>
 5. ✅ ローカルWeb UI
 6. ✅ OAuth 2.0 認可コードフロー+PKCE（画面内の接続ボタン）… 疎通確認済み
 7. ✅ TeamSpirit本番接続・検証 … config のAPI名差し替えのみで動作
-8. ⬜ 今後: 進捗表示・大量件数対応（Bulk API）・配布（exe化等）
+8. ✅ 設定画面（YAMLを編集せずに設定・バックアップ／復元つき）
+9. ⬜ 今後: 進捗表示・大量件数対応（Bulk API）
 
 ## ドキュメント
 
@@ -246,4 +267,5 @@ sf sobject describe --sobject <オブジェクトAPI名>
 - [開発org セットアップ手順](docs/02_dev_org_setup.md)
 - [SOQL / スキーマ探索 チートシート](docs/03_soql_cheatsheet.md)
 - [OAuth 2.0 接続設定（接続アプリの作成）](docs/04_oauth_setup.md)
+- [設定ガイド（管理者向け）](docs/05_settings_guide.md)
 - [変更履歴（CHANGELOG）](CHANGELOG.md)

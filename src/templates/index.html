@@ -85,7 +85,10 @@
 </head>
 <body>
   <div class="topbar">
-    <h1 style="margin:0;">添付ファイル一括ダウンロード</h1>
+    <div style="display:flex; align-items:baseline; gap:14px;">
+      <h1 style="margin:0;">添付ファイル一括ダウンロード</h1>
+      <a href="/settings" style="color:#7dd3fc; text-decoration:none; font-size:.85rem;">⚙ 設定</a>
+    </div>
     {% if status %}
       {% if status.connected and status.via == 'oauth' %}
         <div class="conn">

@@ -4,6 +4,26 @@
 書式は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に、
 バージョン番号は [セマンティック バージョニング](https://semver.org/lang/ja/) に従う。
 
+## [1.3.0-beta.1] - 2026-09-06
+
+### 追加
+- **設定画面（GUI）** を追加。接続情報・対象オブジェクト・表示項目・検索条件・
+  ダウンロード設定を、YAMLを編集せずにブラウザから変更できる
+  - 項目名や選択リストの値は **Salesforceから取得してプルダウンに表示**する。
+    API名（`bunrui__c` など）を調べて打ち込む必要がない
+  - 検索条件は項目を選ぶだけで、入力の種類と選択肢が自動で入る
+  - **保存前に内容を検証**し、問題があれば**保存せずに理由を表示**する
+  - **保存のたびに自動バックアップ**し、画面から前の状態に復元できる
+    （直近20世代／復元の直前も控える）
+  - 鍵は画面に表示せず、入力欄を空にすれば変更されない
+- 設定ガイド（管理者向け）を追加 … `docs/05_settings_guide.md`
+- 設定画面まわりのテスト（合計87件）
+
+### 変更
+- 設定の保存に ruamel.yaml を採用し、**手書きの日本語コメントを保持**する
+  （検索条件の各項目に書いたコメントのみ、書き換え対象のため失われる）
+- `sf_client` に `describe` / `list_objects` を追加（両バックエンド対応）
+
 ## [1.2.0-beta.1] - 2026-09-01
 
 > ベータ版。旧Attachment形式（`attachment_type: "attachment"`）は実データでの検証が
@@ -84,6 +104,7 @@ OAuth 2.0 での接続と TeamSpirit 本番環境での動作を確認し、正�
 - UIをダークモード専用に統一（全要素で WCAG AA 4.5:1 以上）
 - pyenv + Poetry による環境管理
 
+[1.3.0-beta.1]: https://github.com/AtsushiCafeK/sf_query/releases/tag/v1.3.0-beta.1
 [1.2.0-beta.1]: https://github.com/AtsushiCafeK/sf_query/releases/tag/v1.2.0-beta.1
 [1.1.0]: https://github.com/AtsushiCafeK/sf_query/releases/tag/v1.1.0
 [1.0.0]: https://github.com/AtsushiCafeK/sf_query/releases/tag/v1.0.0

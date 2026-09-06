@@ -24,6 +24,9 @@ from query_builder import (
     QueryBuildError,
 )
 import downloader
+import config_store
+import schema
+import settings_form
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(BASE_DIR, "config", "config.yaml")
@@ -274,6 +277,102 @@ def _run(config: dict, do_download: bool):
         object_name=extract_object_name(soql),
         download_summary=summary,
         **ctx,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 設定画面（YAMLを直接編集せずに設定できるようにする）
+# ---------------------------------------------------------------------------
+def _settings_context(config: dict, sobject: str | None = None, **extra):
+    """設定画面に渡す情報。Salesforceに繋がらなくても画面は開けるようにする。"""
+    ringi = config.get("ringi") or {}
+    ctx = {
+        "config": config,
+        "status": _connection_status(config),
+        "object_name": sobject or ringi.get("object_api_name"),
+        "objects": [],
+        "fields": [],
+        "schema_error": None,
+        "backups": config_store.list_backups(),
+        "secret_placeholder": settings_form.SECRET_PLACEHOLDER,
+        "operators": [
+            {"value": "eq", "label": "＝ 一致"},
+            {"value": "ne", "label": "≠ 一致しない"},
+            {"value": "gte", "label": "≧ 以上"},
+            {"value": "lte", "label": "≦ 以下"},
+            {"value": "gt", "label": "＞ より大きい"},
+            {"value": "lt", "label": "＜ より小さい"},
+        ],
+    }
+    try:
+        conn = _connect(config)
+        ctx["objects"] = schema.list_objects(conn)
+        if ctx["object_name"]:
+            ctx["fields"] = schema.describe_fields(conn, ctx["object_name"])
+    except (SalesforceError, KeyError) as exc:
+        # 接続前でも設定できるよう、取得失敗は画面上の注意に留める
+        ctx["schema_error"] = str(exc)
+    ctx.update(extra)
+    return ctx
+
+
+@app.route("/settings")
+def settings():
+    try:
+        config = load_config()
+    except ConfigError as exc:
+        return _config_error_page(str(exc))
+    sobject = request.args.get("object") or None
+    return render_template("settings.html", **_settings_context(config, sobject))
+
+
+@app.route("/settings/save", methods=["POST"])
+def settings_save():
+    """検証に通ったときだけ保存する。保存前に必ずバックアップを取る。"""
+    try:
+        config = load_config()
+    except ConfigError as exc:
+        return _config_error_page(str(exc))
+
+    try:
+        data = config_store.load_roundtrip()   # コメントを保ったまま読む
+        settings_form.apply_all(data, request.form)
+        result = config_store.save(data)
+    except (settings_form.FormError, config_store.ConfigSaveError) as exc:
+        # 保存していないので、入力し直せるよう画面はそのまま出す
+        return render_template(
+            "settings.html",
+            **_settings_context(config, request.form.get("object_api_name"),
+                                save_error=str(exc)),
+        )
+
+    schema.clear_cache()
+    saved = load_config()
+    return render_template(
+        "settings.html",
+        **_settings_context(saved, saved.get("ringi", {}).get("object_api_name"),
+                            saved_message=f"設定を保存しました。（変更前: {os.path.basename(result['backup'])}）"
+                            if result.get("backup") else "設定を保存しました。"),
+    )
+
+
+@app.route("/settings/restore", methods=["POST"])
+def settings_restore():
+    """バックアップから戻す。戻す直前の状態も控える。"""
+    name = request.form.get("backup") or ""
+    try:
+        result = config_store.restore(name)
+    except config_store.ConfigSaveError as exc:
+        config = load_config()
+        return render_template("settings.html",
+                               **_settings_context(config, save_error=str(exc)))
+
+    schema.clear_cache()
+    config = load_config()
+    return render_template(
+        "settings.html",
+        **_settings_context(config, config.get("ringi", {}).get("object_api_name"),
+                            saved_message=f"{result['restored_from']} から復元しました。"),
     )
 
 

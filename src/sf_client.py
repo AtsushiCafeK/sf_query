@@ -116,6 +116,15 @@ class SfCliConnection:
             path = data.get("nextRecordsUrl")  # 相対パス。そのまま次リクエストへ
         return records
 
+    def describe(self, sobject: str) -> dict:
+        """オブジェクトの項目定義（項目名・ラベル・型・選択リスト値）を取得する。"""
+        return self._rest_get(f"/services/data/v{self.api_version}/sobjects/{sobject}/describe/")
+
+    def list_objects(self) -> list[dict]:
+        """組織のオブジェクト一覧（設定画面のプルダウン用）。"""
+        data = self._rest_get(f"/services/data/v{self.api_version}/sobjects/")
+        return data.get("sobjects", []) if isinstance(data, dict) else []
+
     def download_blob(self, sobject: str, record_id: str, blob_field: str,
                       dest_path: str) -> str:
         """任意のオブジェクトのバイナリ項目を保存する。
@@ -183,6 +192,20 @@ class TokenConnection:
             next_url = data.get("nextRecordsUrl")
             url = f"{self.instance_url}{next_url}" if next_url else None
         return records
+
+    def _get_json(self, path: str) -> dict:
+        resp = self._get(self._data_url(path), timeout=60)
+        if not resp.ok:
+            raise SalesforceError(f"取得失敗 ({resp.status_code}): {resp.text[:300]}")
+        return resp.json()
+
+    def describe(self, sobject: str) -> dict:
+        """オブジェクトの項目定義（項目名・ラベル・型・選択リスト値）を取得する。"""
+        return self._get_json(f"sobjects/{sobject}/describe/")
+
+    def list_objects(self) -> list[dict]:
+        """組織のオブジェクト一覧（設定画面のプルダウン用）。"""
+        return self._get_json("sobjects/").get("sobjects", [])
 
     def download_blob(self, sobject: str, record_id: str, blob_field: str,
                       dest_path: str) -> str:

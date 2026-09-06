@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>設定 — 添付ファイル一括ダウンロード</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #1c1f24; --surface: #23272e; --surface-2: #2c313a; --surface-3: #262b32;
+      --text: #e8e8e8; --text-muted: #9aa4b2; --border: #39404a;
+      --accent: #2563eb; --accent-hover: #1d4ed8;
+      --success: #047857; --success-hover: #065f46; --on-accent: #ffffff;
+    }
+    body { font-family: "Segoe UI", "Meiryo", system-ui, sans-serif; margin: 0; padding: 24px;
+           background: var(--bg); color: var(--text); }
+    h1 { font-size: 1.3rem; margin: 0; }
+    h2 { font-size: 1.05rem; margin: 0 0 4px; }
+    .topbar { display: flex; justify-content: space-between; align-items: center;
+              flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+    .card { background: var(--surface); border-radius: 10px; padding: 18px 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.35); margin-bottom: 18px; }
+    .sec-desc { color: var(--text-muted); font-size: .82rem; margin: 0 0 14px; line-height: 1.7; }
+    .grid { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field.wide { flex: 1 1 320px; }
+    label { font-size: .8rem; color: var(--text-muted); }
+    input, select { padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px;
+                    font-size: .93rem; background: var(--bg); color: var(--text); }
+    input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    button { padding: 9px 18px; border: 0; border-radius: 6px; font-size: .95rem; cursor: pointer; }
+    .btn-primary { background: var(--accent); color: var(--on-accent); }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-sub { background: transparent; color: var(--text); border: 1px solid var(--border);
+               padding: 6px 12px; font-size: .82rem; }
+    .btn-sub:hover { background: var(--surface-2); }
+    .btn-danger { background: transparent; color: #fca5a5; border: 1px solid #7f3034;
+                  padding: 5px 10px; font-size: .78rem; }
+    .link { color: #7dd3fc; text-decoration: none; font-size: .88rem; }
+    .msg-error, .msg-ok, .msg-warn { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; }
+    .msg-error { background: #3b1f22; color: #fca5a5; border-left: 3px solid #ef4444; }
+    .msg-ok { background: #14352a; color: #6ee7b7; border-left: 3px solid #10b981; }
+    .msg-warn { background: #3a2f14; color: #fcd34d; border-left: 3px solid #f59e0b; }
+    .pre { white-space: pre-wrap; margin-top: 8px; font-size: .87rem; line-height: 1.7; }
+    .cols { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 6px; }
+    .cols label { display: flex; align-items: center; gap: 6px; font-size: .86rem; color: var(--text); }
+    .filter { border: 1px solid var(--border); border-radius: 8px; padding: 14px;
+              margin-bottom: 12px; background: var(--surface-3); }
+    .filter-head { display: flex; justify-content: space-between; align-items: center;
+                   gap: 12px; margin-bottom: 10px; }
+    .opts { margin-top: 10px; }
+    .opt-row { display: flex; gap: 8px; margin-bottom: 6px; align-items: center; }
+    .opt-row input { flex: 1 1 140px; font-size: .85rem; }
+    .hint { font-size: .78rem; color: var(--text-muted); margin-top: 6px; line-height: 1.6; }
+    table { border-collapse: collapse; width: 100%; font-size: .86rem; margin-top: 8px; }
+    th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); }
+    th { background: var(--surface-2); }
+    code { font-family: ui-monospace, "Consolas", monospace; font-size: .85rem; }
+    .sticky { position: sticky; bottom: 0; background: var(--surface);
+              border-top: 1px solid var(--border); padding: 14px 20px; margin: 0 -20px -18px;
+              border-radius: 0 0 10px 10px; display: flex; gap: 12px; align-items: center; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>設定</h1>
+    <a class="link" href="/">← 検索画面へ戻る</a>
+  </div>
+
+  {% if save_error %}
+    <div class="msg-error">
+      <strong>⚠ 保存していません</strong>
+      <div class="pre">{{ save_error }}</div>
+      <div class="hint">内容が正しくないため、設定ファイルは変更していません。直してからもう一度保存してください。</div>
+    </div>
+  {% endif %}
+
+  {% if saved_message %}
+    <div class="msg-ok">✔ {{ saved_message }}</div>
+  {% endif %}
+
+  {% if schema_error %}
+    <div class="msg-warn">
+      <strong>Salesforceからの取得ができませんでした</strong>
+      <div class="pre">{{ schema_error }}</div>
+      <div class="hint">
+        接続前でも「① 接続設定」は入力できます。保存して接続できるようになると、
+        オブジェクトや項目をプルダウンから選べるようになります。
+      </div>
+    </div>
+  {% endif %}
+
+  <form method="post" action="/settings/save">
+
+    <!-- ① 接続設定 -->
+    <div class="card">
+      <h2>① 接続設定</h2>
+      <p class="sec-desc">Salesforceへの接続に使う情報です。キーは保存済みでも画面には表示しません。</p>
+      <div class="grid">
+        <div class="field">
+          <label for="login_url">ログイン先</label>
+          <select id="login_url" name="login_url">
+            {% set lu = config.salesforce.login_url or 'https://login.salesforce.com' %}
+            <option value="https://login.salesforce.com" {% if lu == 'https://login.salesforce.com' %}selected{% endif %}>本番・開発組織</option>
+            <option value="https://test.salesforce.com" {% if lu == 'https://test.salesforce.com' %}selected{% endif %}>Sandbox（検証環境）</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="auth_mode">認証方式</label>
+          <select id="auth_mode" name="auth_mode">
+            {% set am = config.salesforce.auth_mode or 'oauth' %}
+            <option value="oauth" {% if am == 'oauth' %}selected{% endif %}>OAuth（利用者ごとにログイン）</option>
+            <option value="cli" {% if am == 'cli' %}selected{% endif %}>sf CLI（開発用）</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="api_version">APIバージョン</label>
+          <input id="api_version" name="api_version" size="6"
+                 value="{{ config.salesforce.api_version or '60.0' }}">
+        </div>
+        <div class="field wide">
+          <label for="client_id">コンシューマー鍵（Consumer Key）</label>
+          <input id="client_id" name="client_id" type="password" autocomplete="off"
+                 placeholder="{% if config.salesforce.oauth and config.salesforce.oauth.client_id %}{{ secret_placeholder }}（変更しない場合は空欄）{% else %}接続アプリのコンシューマー鍵{% endif %}">
+        </div>
+        <div class="field wide">
+          <label for="client_secret">コンシューマーシークレット（通常は空でよい）</label>
+          <input id="client_secret" name="client_secret" type="password" autocomplete="off"
+                 placeholder="{% if config.salesforce.oauth and config.salesforce.oauth.client_secret %}{{ secret_placeholder }}（変更しない場合は空欄）{% else %}PKCE構成では不要{% endif %}">
+        </div>
+        <div class="field wide">
+          <label for="redirect_uri">コールバックURL</label>
+          <input id="redirect_uri" name="redirect_uri"
+                 value="{{ config.salesforce.oauth.redirect_uri if config.salesforce.oauth else 'http://localhost:8080/oauth/callback' }}">
+        </div>
+        <div class="field">
+          <label for="cli_target_org">sf CLI の組織別名</label>
+          <input id="cli_target_org" name="cli_target_org" size="14"
+                 value="{{ config.salesforce.cli_target_org or '' }}">
+        </div>
+      </div>
+      <div class="hint">
+        鍵は入力欄を<strong>空のままにすると変更されません</strong>。接続アプリの作り方は手順書（docs/04_oauth_setup.md）を参照してください。
+      </div>
+    </div>
+
+    <!-- ② 対象オブジェクトと項目 -->
+    <div class="card">
+      <h2>② 対象オブジェクトと表示項目</h2>
+      <p class="sec-desc">
+        どのオブジェクトの、どの項目を扱うかを決めます。項目はSalesforceから取得した一覧から選ぶので、API名を打ち込む必要はありません。
+      </p>
+      <div class="grid">
+        <div class="field wide">
+          <label for="object_api_name">対象オブジェクト</label>
+          <select id="object_api_name" name="object_api_name"
+                  onchange="location.href='/settings?object=' + encodeURIComponent(this.value)">
+            {% if not objects %}<option value="{{ object_name or '' }}">{{ object_name or '（取得できません）' }}</option>{% endif %}
+            {% for o in objects %}
+              <option value="{{ o.name }}" {% if o.name == object_name %}selected{% endif %}>
+                {{ o.label }} ({{ o.name }}){% if o.custom %} ★カスタム{% endif %}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="attachment_type">添付の形式</label>
+          <select id="attachment_type" name="attachment_type">
+            {% set at = config.ringi.attachment_type or 'files' %}
+            <option value="files" {% if at == 'files' %}selected{% endif %}>Salesforce Files（通常）</option>
+            <option value="attachment" {% if at == 'attachment' %}selected{% endif %}>旧Attachment形式</option>
+          </select>
+        </div>
+      </div>
+      <div class="hint">オブジェクトを変えると項目一覧が読み込み直されます（保存はされません）。</div>
+
+      {% macro field_select(id, name, current) %}
+        <select id="{{ id }}" name="{{ name }}">
+          <option value="">（指定なし）</option>
+          {% if fields %}
+            {% for f in fields %}
+              <option value="{{ f.name }}" {% if f.name == current %}selected{% endif %}>{{ f.display }}</option>
+            {% endfor %}
+            {% if current and current not in fields|map(attribute='name')|list %}
+              <option value="{{ current }}" selected>{{ current }}（一覧に無い項目）</option>
+            {% endif %}
+          {% else %}
+            <option value="{{ current or '' }}" selected>{{ current or '（取得できません）' }}</option>
+          {% endif %}
+        </select>
+      {% endmacro %}
+
+      <div class="grid" style="margin-top:16px;">
+        <div class="field wide">
+          <label for="field_title">件名にする項目（必須・フォルダ名と一覧表に使う）</label>
+          {{ field_select('field_title', 'field_title', config.ringi.fields.title if config.ringi.fields else '') }}
+        </div>
+        <div class="field wide">
+          <label for="field_status">ステータスの項目（一覧表に使う）</label>
+          {{ field_select('field_status', 'field_status', config.ringi.fields.status if config.ringi.fields else '') }}
+        </div>
+        <div class="field wide">
+          <label for="field_application_date">申請日の項目（一覧表に使う）</label>
+          {{ field_select('field_application_date', 'field_application_date', config.ringi.fields.application_date if config.ringi.fields else '') }}
+        </div>
+      </div>
+
+      <div style="margin-top:16px;">
+        <label>検索結果に表示する列</label>
+        <div class="cols">
+          {% set cur_cols = config.ringi.columns or [] %}
+          {% if fields %}
+            {% for f in fields %}
+              <label><input type="checkbox" name="columns" value="{{ f.name }}"
+                     {% if f.name in cur_cols %}checked{% endif %}> {{ f.display }}</label>
+            {% endfor %}
+          {% endif %}
+          {% for c in cur_cols %}
+            {% if not fields or c not in fields|map(attribute='name')|list %}
+              <label><input type="checkbox" name="columns" value="{{ c }}" checked> {{ c }}（一覧に無い項目）</label>
+            {% endif %}
+          {% endfor %}
+        </div>
+        <div class="hint">
+          リレーション項目（例 <code>LastModifiedBy.Name</code>）は一覧に出ないため、既存の設定をそのまま残す形で表示しています。
+        </div>
+      </div>
+
+      <div class="grid" style="margin-top:16px;">
+        {% set ob = (config.ringi.order_by or '').split(' ') %}
+        <div class="field wide">
+          <label for="order_by_field">並び順に使う項目</label>
+          {{ field_select('order_by_field', 'order_by_field', ob[0] if ob else '') }}
+        </div>
+        <div class="field">
+          <label for="order_by_dir">向き</label>
+          <select id="order_by_dir" name="order_by_dir">
+            <option value="DESC" {% if ob|length > 1 and ob[1]|upper == 'DESC' %}selected{% endif %}>新しい順（降順）</option>
+            <option value="ASC" {% if ob|length > 1 and ob[1]|upper == 'ASC' %}selected{% endif %}>古い順（昇順）</option>
+          </select>
+        </div>
+      </div>
+      <div class="hint">この並び順が、ダウンロードしたファイルの連番（001, 002…）の順序になります。</div>
+    </div>
+
+    <!-- ③ 検索条件 -->
+    <div class="card">
+      <h2>③ 検索条件（画面の絞り込み欄）</h2>
+      <p class="sec-desc">
+        ここで追加した条件が、検索画面の入力欄になります。項目を選ぶと、型と選択肢がSalesforceの定義から自動で入ります。
+      </p>
+
+      <div id="filters">
+        {% for f in config.ringi.filters or [] %}
+          {% set idx = loop.index0 %}
+          <div class="filter" data-index="{{ idx }}">
+            <input type="hidden" name="filter_index" value="{{ idx }}">
+            <div class="filter-head">
+              <strong>{{ f.label or f.name }}</strong>
+              <label style="color:#fca5a5; font-size:.8rem;">
+                <input type="checkbox" name="f_{{ idx }}_delete"> この条件を削除
+              </label>
+            </div>
+            <div class="grid">
+              <div class="field wide">
+                <label>対象の項目</label>
+                <select name="f_{{ idx }}_field" onchange="onFieldChange(this, '{{ idx }}')">
+                  {% if fields %}
+                    {% for fl in fields %}
+                      <option value="{{ fl.name }}" data-type="{{ fl.filter_type or '' }}"
+                        data-options='{{ fl.options|tojson }}' data-label="{{ fl.label }}"
+                        {% if fl.name == f.field %}selected{% endif %}>{{ fl.display }}</option>
+                    {% endfor %}
+                    {% if f.field and f.field not in fields|map(attribute='name')|list %}
+                      <option value="{{ f.field }}" selected>{{ f.field }}（一覧に無い項目）</option>
+                    {% endif %}
+                  {% else %}
+                    <option value="{{ f.field }}" selected>{{ f.field }}</option>
+                  {% endif %}
+                </select>
+              </div>
+              <div class="field">
+                <label>画面に出す名前</label>
+                <input name="f_{{ idx }}_label" value="{{ f.label or '' }}">
+              </div>
+              <div class="field">
+                <label>入力の種類</label>
+                <select name="f_{{ idx }}_type" onchange="toggleOptions('{{ idx }}')">
+                  <option value="select" {% if f.type == 'select' %}selected{% endif %}>プルダウン</option>
+                  <option value="date" {% if f.type == 'date' %}selected{% endif %}>カレンダー</option>
+                  <option value="number" {% if f.type == 'number' %}selected{% endif %}>数値</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>条件</label>
+                <select name="f_{{ idx }}_operator">
+                  {% for op in operators %}
+                    <option value="{{ op.value }}" {% if (f.operator or 'eq') == op.value %}selected{% endif %}>{{ op.label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="field">
+                <label>内部名（英数字）</label>
+                <input name="f_{{ idx }}_name" value="{{ f.name }}" size="12">
+              </div>
+            </div>
+
+            <div class="opts" id="opts_{{ idx }}" style="{% if f.type != 'select' %}display:none;{% endif %}">
+              <label>プルダウンの選択肢</label>
+              <div id="optrows_{{ idx }}">
+                {% for o in f.options or [] %}
+                  <div class="opt-row">
+                    <input name="f_{{ idx }}_opt_value" value="{{ o.value }}" placeholder="保存値">
+                    <input name="f_{{ idx }}_opt_label" value="{{ o.label }}" placeholder="画面表示">
+                    <button type="button" class="btn-danger" onclick="this.parentElement.remove()">削除</button>
+                  </div>
+                {% endfor %}
+              </div>
+              <button type="button" class="btn-sub" onclick="addOption('{{ idx }}')">選択肢を追加</button>
+              <div class="hint">保存値はSalesforceの値と一致させます。画面表示だけ日本語にできます。</div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      <button type="button" class="btn-sub" onclick="addFilter()">＋ 検索条件を追加</button>
+    </div>
+
+    <!-- ④ ダウンロード設定 -->
+    <div class="card">
+      <h2>④ ダウンロード設定</h2>
+      <p class="sec-desc">添付ファイルの保存先と、印刷しやすい配置を決めます。</p>
+      <div class="grid">
+        <div class="field wide">
+          <label for="output_dir">保存先フォルダ</label>
+          <input id="output_dir" name="output_dir" value="{{ config.download.output_dir or './downloads' }}">
+        </div>
+        <div class="field">
+          <label for="group_by_record">ファイルの置き方</label>
+          <select id="group_by_record_sel" onchange="document.getElementById('group_by_record').checked = (this.value=='1')">
+            <option value="1" {% if config.download.group_by_record %}selected{% endif %}>レコードごとのフォルダ（整理向き）</option>
+            <option value="0" {% if not config.download.group_by_record %}selected{% endif %}>平置き（印刷向き）</option>
+          </select>
+          <input type="checkbox" id="group_by_record" name="group_by_record" hidden
+                 {% if config.download.group_by_record %}checked{% endif %}>
+        </div>
+      </div>
+      <div class="cols" style="margin-top:12px;">
+        <label><input type="checkbox" name="zip" {% if config.download.zip %}checked{% endif %}> ZIPにまとめる</label>
+        <label><input type="checkbox" name="manifest" {% if config.download.manifest %}checked{% endif %}> 一覧表(CSV)を出力する</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sticky">
+        <button type="submit" class="btn-primary">設定を保存</button>
+        <span class="hint" style="margin:0;">
+          保存前に内容を検証します。問題があれば保存せずに理由を表示します。保存時は変更前の内容を自動でバックアップします。
+        </span>
+      </div>
+    </div>
+  </form>
+
+  <!-- バックアップ -->
+  <div class="card">
+    <h2>バックアップ</h2>
+    <p class="sec-desc">保存のたびに変更前の内容を控えています。おかしくなったらここから戻せます。</p>
+    {% if backups %}
+      <table>
+        <thead><tr><th>保存日時</th><th>ファイル</th><th></th></tr></thead>
+        <tbody>
+          {% for b in backups[:10] %}
+            <tr>
+              <td>{{ b.saved_at }}</td>
+              <td><code>{{ b.name }}</code></td>
+              <td>
+                <form method="post" action="/settings/restore" style="margin:0;"
+                      onsubmit="return confirm('{{ b.name }} の内容に戻します。よろしいですか？（現在の内容もバックアップされます）')">
+                  <input type="hidden" name="backup" value="{{ b.name }}">
+                  <button type="submit" class="btn-sub">この時点に戻す</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="hint">まだバックアップはありません。設定を保存すると作られます。</p>
+    {% endif %}
+  </div>
+
+<script>
+  let nextIndex = {{ (config.ringi.filters or [])|length }};
+
+  function onFieldChange(sel, idx) {
+    const opt = sel.selectedOptions[0];
+    if (!opt) return;
+    const type = opt.dataset.type;
+    const typeSel = document.querySelector(`[name="f_${idx}_type"]`);
+    if (type && typeSel) { typeSel.value = type; }
+
+    // 表示名が空、または前の項目名のままなら、選んだ項目のラベルを入れる
+    const labelInput = document.querySelector(`[name="f_${idx}_label"]`);
+    if (labelInput && !labelInput.value.trim() && opt.dataset.label) {
+      labelInput.value = opt.dataset.label;
+    }
+    // 内部名が空なら項目名から作る
+    const nameInput = document.querySelector(`[name="f_${idx}_name"]`);
+    if (nameInput && !nameInput.value.trim()) {
+      nameInput.value = sel.value.replace(/__c$/, '').replace(/[^A-Za-z0-9_]/g, '_').toLowerCase();
+    }
+
+    // 選択リストなら選択肢をSalesforceの定義で埋める
+    if (type === 'select' && opt.dataset.options) {
+      const rows = document.getElementById(`optrows_${idx}`);
+      const opts = JSON.parse(opt.dataset.options);
+      if (rows && opts.length) {
+        rows.innerHTML = '';
+        opts.forEach(o => rows.appendChild(optionRow(idx, o.value, o.label)));
+      }
+    }
+    toggleOptions(idx);
+  }
+
+  function toggleOptions(idx) {
+    const typeSel = document.querySelector(`[name="f_${idx}_type"]`);
+    const box = document.getElementById(`opts_${idx}`);
+    if (typeSel && box) box.style.display = (typeSel.value === 'select') ? '' : 'none';
+  }
+
+  function optionRow(idx, value, label) {
+    const div = document.createElement('div');
+    div.className = 'opt-row';
+    div.innerHTML =
+      `<input name="f_${idx}_opt_value" placeholder="保存値">` +
+      `<input name="f_${idx}_opt_label" placeholder="画面表示">` +
+      `<button type="button" class="btn-danger" onclick="this.parentElement.remove()">削除</button>`;
+    div.querySelector(`[name="f_${idx}_opt_value"]`).value = value || '';
+    div.querySelector(`[name="f_${idx}_opt_label"]`).value = label || '';
+    return div;
+  }
+
+  function addOption(idx) {
+    document.getElementById(`optrows_${idx}`).appendChild(optionRow(idx, '', ''));
+  }
+
+  function addFilter() {
+    const idx = nextIndex++;
+    const tpl = document.querySelector('.filter');
+    const box = document.createElement('div');
+    box.className = 'filter';
+    if (tpl) {
+      // 既存の1件を複製して番号を振り直す（項目一覧をそのまま使える）
+      box.innerHTML = tpl.innerHTML
+        .replace(/f_\d+_/g, `f_${idx}_`)
+        .replace(/opts_\d+/g, `opts_${idx}`)
+        .replace(/optrows_\d+/g, `optrows_${idx}`)
+        .replace(/'\d+'\)/g, `'${idx}')`);
+      box.querySelector('[name="filter_index"]').value = idx;
+      box.querySelectorAll('input[type="text"], input:not([type])').forEach(i => i.value = '');
+      box.querySelectorAll('input[type="checkbox"]').forEach(i => i.checked = false);
+      const rows = box.querySelector(`#optrows_${idx}`);
+      if (rows) rows.innerHTML = '';
+      box.querySelector('.filter-head strong').textContent = '新しい検索条件';
+    } else {
+      box.innerHTML = '<p class="hint">項目一覧が取得できないため、追加にはSalesforce接続が必要です。</p>';
+    }
+    document.getElementById('filters').appendChild(box);
+  }
+</script>
+</body>
+</html>
