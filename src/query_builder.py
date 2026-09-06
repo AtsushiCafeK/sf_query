@@ -256,6 +256,25 @@ def check_config_warnings(config: dict) -> list[str]:
             "一覧表(CSV)の件名も空になります。"
         )
 
+    # 絞り込みには使えるのに一覧に出ない項目は、設定した本人も気づきにくい
+    columns = list(ringi.get("columns") or [])
+    if columns:
+        title = fields.get("title")
+        hidden = []
+        for fdef in ringi.get("filters") or []:
+            if not isinstance(fdef, dict):
+                continue
+            field = fdef.get("field")
+            if field and field not in columns:
+                hidden.append(f"{fdef.get('label') or fdef.get('name')}（{field}）")
+        if hidden:
+            warnings.append(
+                "次の検索条件は絞り込みには使えますが、"
+                "検索結果の列に含まれていないため一覧には表示されません: "
+                + "、".join(hidden)
+                + "。表示したい場合は「検索結果に表示する列」にも追加してください。"
+            )
+
     if str(ringi.get("attachment_type") or "files").lower() == "attachment":
         warnings.append(
             "`ringi.attachment_type` が `attachment`（旧Attachment形式）です。"

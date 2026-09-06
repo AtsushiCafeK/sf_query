@@ -99,3 +99,23 @@ def test_旧Attachment形式は未検証である旨を警告する(config):
 
 def test_正常な設定では警告が出ない(config):
     assert check_config_warnings(config) == []
+
+
+def test_絞り込めるが一覧に出ない項目を警告する(config):
+    """③に条件を足しても②の列は増えないため、設定者が気づけるようにする。"""
+    config["ringi"]["filters"].append({
+        "name": "amount_min", "label": "金額（以上）", "type": "number",
+        "field": "Amount__c", "operator": "gte",
+    })
+    assert validate_config(config) == []       # 正当な設定なので保存は妨げない
+    warnings = check_config_warnings(config)
+    assert any("Amount__c" in w and "一覧には表示されません" in w for w in warnings)
+
+
+def test_列にも入れれば警告は出ない(config):
+    config["ringi"]["filters"].append({
+        "name": "amount_min", "label": "金額（以上）", "type": "number",
+        "field": "Amount__c", "operator": "gte",
+    })
+    config["ringi"]["columns"].append("Amount__c")
+    assert not any("Amount__c" in w for w in check_config_warnings(config))

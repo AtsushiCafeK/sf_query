@@ -341,6 +341,7 @@ def _settings_context(config: dict, sobject: str | None = None, **extra):
         ],
     }
     ctx["soql_preview"], ctx["soql_example"] = _soql_previews(config)
+    ctx["config_warnings"] = check_config_warnings(config)
 
     try:
         conn = _connect(config)

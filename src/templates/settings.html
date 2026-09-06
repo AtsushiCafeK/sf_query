@@ -85,6 +85,14 @@
     <div class="msg-ok">✔ {{ saved_message }}</div>
   {% endif %}
 
+  {% if config_warnings %}
+    <div class="msg-warn">
+      <strong>設定の確認</strong>
+      <div class="pre">{% for w in config_warnings %}{{ w }}
+{% endfor %}</div>
+    </div>
+  {% endif %}
+
   {% if schema_error %}
     <div class="msg-warn">
       <strong>Salesforceからの取得ができませんでした</strong>
@@ -235,6 +243,10 @@
 
       <div style="margin-top:16px;">
         <label>検索結果に表示する列（SOQL: <code>SELECT</code>）</label>
+        <div class="hint" style="margin:0 0 4px;">
+          ③で検索条件を追加しても、この列は自動では増えません。
+          <strong>絞り込みに使う項目を一覧にも出したい場合は、ここでもチェックを入れてください。</strong>
+        </div>
         <div class="cols">
           {% set cur_cols = config.ringi.columns or [] %}
           {% if fields %}
@@ -295,8 +307,11 @@
       <h2>③ 検索条件（画面の絞り込み欄）</h2>
       <p class="sec-desc">
         ここで追加した条件が、検索画面の入力欄になります。項目を選ぶと、型と選択肢がSalesforceの定義から自動で入ります。
+        <br>ここに追加するのは<strong>絞り込みの入力欄</strong>です。
+        検索結果の<strong>列は増えません</strong>（列は②で選びます）。
         <br><span class="soql-note">SOQLが分かる方向け：ここで作った条件が <code>WHERE</code> 句になります。
-        利用者が複数の欄に入力すると <code>AND</code> でつながります（入力しなかった欄は条件に含まれません）。</span>
+        利用者が複数の欄に入力すると <code>AND</code> でつながります（入力しなかった欄は条件に含まれません）。
+        <code>SELECT</code> は②の「表示する列」だけで決まります。</span>
       </p>
 
       <div id="filters">
