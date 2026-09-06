@@ -283,6 +283,42 @@ def _run(config: dict, do_download: bool):
 # ---------------------------------------------------------------------------
 # 設定画面（YAMLを直接編集せずに設定できるようにする）
 # ---------------------------------------------------------------------------
+def _sample_value(fdef: dict) -> str | None:
+    """SOQLの例を作るための、その条件に入れて妥当な値。"""
+    ftype = fdef.get("type")
+    if ftype == "select":
+        options = fdef.get("options") or []
+        return str(options[0].get("value")) if options else None
+    if ftype == "date":
+        return "2026-01-01"
+    if ftype == "number":
+        return "1000"
+    return None
+
+
+def _soql_previews(config: dict) -> tuple[str | None, str | None]:
+    """設定がどんなSOQLになるかを見せる。
+
+    設定項目とSOQLの対応は、言葉で説明するより実物を見るのが早い。
+    条件なし（SELECT/FROM/ORDER BY）と、全条件を入れた例（WHERE/AND）の2つを返す。
+    """
+    try:
+        plain = build_ringi_query(config)
+    except (QueryBuildError, KeyError):
+        return None, None
+
+    sample = {}
+    for fdef in get_filter_defs(config):
+        value = _sample_value(fdef)
+        if value is not None:
+            sample[str(fdef.get("name"))] = value
+    try:
+        example = build_ringi_query(config, sample) if sample else None
+    except (QueryBuildError, KeyError):
+        example = None
+    return plain, example
+
+
 def _settings_context(config: dict, sobject: str | None = None, **extra):
     """設定画面に渡す情報。Salesforceに繋がらなくても画面は開けるようにする。"""
     ringi = config.get("ringi") or {}
@@ -296,14 +332,16 @@ def _settings_context(config: dict, sobject: str | None = None, **extra):
         "backups": config_store.list_backups(),
         "secret_placeholder": settings_form.SECRET_PLACEHOLDER,
         "operators": [
-            {"value": "eq", "label": "＝ 一致"},
-            {"value": "ne", "label": "≠ 一致しない"},
-            {"value": "gte", "label": "≧ 以上"},
-            {"value": "lte", "label": "≦ 以下"},
-            {"value": "gt", "label": "＞ より大きい"},
-            {"value": "lt", "label": "＜ より小さい"},
+            {"value": "eq", "label": "一致する（SOQL: =）"},
+            {"value": "ne", "label": "一致しない（SOQL: !=）"},
+            {"value": "gte", "label": "以上（SOQL: >=）"},
+            {"value": "lte", "label": "以下（SOQL: <=）"},
+            {"value": "gt", "label": "より大きい（SOQL: >）"},
+            {"value": "lt", "label": "より小さい（SOQL: <）"},
         ],
     }
+    ctx["soql_preview"], ctx["soql_example"] = _soql_previews(config)
+
     try:
         conn = _connect(config)
         ctx["objects"] = schema.list_objects(conn)

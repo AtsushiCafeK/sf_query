@@ -56,6 +56,12 @@
     th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); }
     th { background: var(--surface-2); }
     code { font-family: ui-monospace, "Consolas", monospace; font-size: .85rem; }
+    .soql-note { color: #93c5fd; }
+    .soql-label { font-size: .78rem; color: var(--text-muted); margin: 10px 0 4px; }
+    .soql-box { font-family: ui-monospace, "Consolas", monospace; font-size: .8rem;
+                background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+                padding: 10px 12px; margin: 0; white-space: pre-wrap; word-break: break-all;
+                line-height: 1.6; color: #cbd5e1; }
     .sticky { position: sticky; bottom: 0; background: var(--surface);
               border-top: 1px solid var(--border); padding: 14px 20px; margin: 0 -20px -18px;
               border-radius: 0 0 10px 10px; display: flex; gap: 12px; align-items: center; }
@@ -149,10 +155,11 @@
       <h2>② 対象オブジェクトと表示項目</h2>
       <p class="sec-desc">
         どのオブジェクトの、どの項目を扱うかを決めます。項目はSalesforceから取得した一覧から選ぶので、API名を打ち込む必要はありません。
+        <br><span class="soql-note">SOQLが分かる方向け：対象オブジェクト＝<code>FROM</code>、表示する列＝<code>SELECT</code>、並び順＝<code>ORDER BY</code> になります。</span>
       </p>
       <div class="grid">
         <div class="field wide">
-          <label for="object_api_name">対象オブジェクト</label>
+          <label for="object_api_name">対象オブジェクト（SOQL: <code>FROM</code>）</label>
           {% if objects %}
             {% set relevant = objects|selectattr('relevant')|list %}
             <input id="object_filter" type="search" placeholder="名前で絞り込む（例: 稟議 / Ringi）"
@@ -227,7 +234,7 @@
       </div>
 
       <div style="margin-top:16px;">
-        <label>検索結果に表示する列</label>
+        <label>検索結果に表示する列（SOQL: <code>SELECT</code>）</label>
         <div class="cols">
           {% set cur_cols = config.ringi.columns or [] %}
           {% if fields %}
@@ -250,7 +257,7 @@
       <div class="grid" style="margin-top:16px;">
         {% set ob = (config.ringi.order_by or '').split(' ') %}
         <div class="field wide">
-          <label for="order_by_field">並び順に使う項目</label>
+          <label for="order_by_field">並び順に使う項目（SOQL: <code>ORDER BY</code>）</label>
           {{ field_select('order_by_field', 'order_by_field', ob[0] if ob else '') }}
         </div>
         <div class="field">
@@ -264,11 +271,32 @@
       <div class="hint">この並び順が、ダウンロードしたファイルの連番（001, 002…）の順序になります。</div>
     </div>
 
+    <!-- 生成されるSOQL -->
+    {% if soql_preview %}
+      <div class="card">
+        <h2>この設定で組み立てられるSOQL</h2>
+        <p class="sec-desc">
+          いま保存されている設定が、実際にどんな問い合わせになるかです。保存すると更新されます。
+        </p>
+        <div class="soql-label">検索条件を何も入力しなかったとき</div>
+        <pre class="soql-box">{{ soql_preview }}</pre>
+        {% if soql_example %}
+          <div class="soql-label">すべての検索条件を入力したとき（値は例）</div>
+          <pre class="soql-box">{{ soql_example }}</pre>
+          <div class="hint">
+            条件は入力された分だけ <code>WHERE</code> に加わり、複数あれば <code>AND</code> でつながります。
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
     <!-- ③ 検索条件 -->
     <div class="card">
       <h2>③ 検索条件（画面の絞り込み欄）</h2>
       <p class="sec-desc">
         ここで追加した条件が、検索画面の入力欄になります。項目を選ぶと、型と選択肢がSalesforceの定義から自動で入ります。
+        <br><span class="soql-note">SOQLが分かる方向け：ここで作った条件が <code>WHERE</code> 句になります。
+        利用者が複数の欄に入力すると <code>AND</code> でつながります（入力しなかった欄は条件に含まれません）。</span>
       </p>
 
       <div id="filters">
@@ -284,7 +312,7 @@
             </div>
             <div class="grid">
               <div class="field wide">
-                <label>対象の項目</label>
+                <label>対象の項目（SOQL: <code>WHERE</code> の左辺）</label>
                 <select name="f_{{ idx }}_field" onchange="onFieldChange(this, '{{ idx }}')">
                   {% if fields %}
                     {% for fl in fields %}
@@ -313,7 +341,7 @@
                 </select>
               </div>
               <div class="field">
-                <label>条件</label>
+                <label>条件（比較演算子）</label>
                 <select name="f_{{ idx }}_operator">
                   {% for op in operators %}
                     <option value="{{ op.value }}" {% if (f.operator or 'eq') == op.value %}selected{% endif %}>{{ op.label }}</option>

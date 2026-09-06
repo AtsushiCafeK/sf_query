@@ -295,3 +295,38 @@ def test_パッケージの名前空間を取り出せる():
     assert schema._namespace("teamspirit__Ringi__c") == "teamspirit"
     assert schema._namespace("Ringi__c") == ""
     assert schema._namespace("Account") == ""
+
+
+# --- SOQLプレビュー（設定とSOQLの対応を実物で見せる） -----------------------
+def test_条件なしのプレビューにSELECTとFROMが出る():
+    import app
+    import yaml
+    cfg = yaml.safe_load(io.StringIO(SAMPLE))
+    plain, _ = app._soql_previews(cfg)
+    assert plain.startswith("SELECT Id, Name")
+    assert "FROM Ringi__c" in plain
+    assert "ORDER BY" in plain
+    assert "WHERE" not in plain          # 未入力の条件は含まれない
+
+
+def test_全条件を入れた例にWHEREとANDが出る():
+    """複数条件が AND でつながることを、実物で示せること。"""
+    import app
+    import yaml
+    cfg = yaml.safe_load(io.StringIO(SAMPLE))
+    cfg["ringi"]["filters"].append({
+        "name": "date_from", "label": "申請日（開始）", "type": "date",
+        "field": "ApplicationDate__c", "operator": "gte",
+    })
+    _, example = app._soql_previews(cfg)
+    assert "WHERE" in example
+    assert " AND " in example
+    assert "Status__c = 'Done'" in example          # select は先頭の選択肢を使う
+    assert "ApplicationDate__c >= 2026-01-01" in example
+
+
+def test_設定が壊れていてもプレビューで落ちない():
+    """プレビューのために画面が開けなくなっては本末転倒。"""
+    import app
+    plain, example = app._soql_previews({"ringi": {}})
+    assert plain is None and example is None
