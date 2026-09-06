@@ -153,15 +153,36 @@
       <div class="grid">
         <div class="field wide">
           <label for="object_api_name">対象オブジェクト</label>
-          <select id="object_api_name" name="object_api_name"
-                  onchange="location.href='/settings?object=' + encodeURIComponent(this.value)">
-            {% if not objects %}<option value="{{ object_name or '' }}">{{ object_name or '（取得できません）' }}</option>{% endif %}
-            {% for o in objects %}
-              <option value="{{ o.name }}" {% if o.name == object_name %}selected{% endif %}>
-                {{ o.label }} ({{ o.name }}){% if o.custom %} ★カスタム{% endif %}
-              </option>
-            {% endfor %}
-          </select>
+          {% if objects %}
+            {% set relevant = objects|selectattr('relevant')|list %}
+            <input id="object_filter" type="search" placeholder="名前で絞り込む（例: 稟議 / Ringi）"
+                   oninput="filterObjects()" style="margin-bottom:6px;">
+            <select id="object_api_name" name="object_api_name" size="8"
+                    onchange="location.href='/settings?object=' + encodeURIComponent(this.value)">
+              {% for o in objects %}
+                <option value="{{ o.name }}" data-relevant="{{ 1 if o.relevant else 0 }}"
+                        data-search="{{ (o.label ~ ' ' ~ o.name)|lower }}"
+                        {% if o.name == object_name %}selected{% endif %}>
+                  {{ o.label }} ({{ o.name }}){% if o.namespace %} ／{{ o.namespace }} パッケージ{% elif o.custom %} ／カスタム{% endif %}
+                </option>
+              {% endfor %}
+            </select>
+            <label style="display:flex; align-items:center; gap:6px; margin-top:6px; font-size:.8rem;">
+              <input type="checkbox" id="show_all_objects" onchange="filterObjects()">
+              標準オブジェクトも表示する（{{ objects|length }}件すべて）
+            </label>
+            <div class="hint" id="object_count">
+              この組織で作成・追加された {{ relevant|length }} 件を表示しています。
+              目的のものが無い場合は、上のチェックを入れてください。
+            </div>
+          {% else %}
+            <input id="object_api_name" name="object_api_name"
+                   value="{{ object_name or '' }}" placeholder="例: Ringi__c">
+            <div class="hint">
+              Salesforceに接続できていないため、一覧を取得できませんでした。
+              API名を直接入力するか、①の接続設定を整えて接続してください。
+            </div>
+          {% endif %}
         </div>
         <div class="field">
           <label for="attachment_type">添付の形式</label>
@@ -391,6 +412,31 @@
 
 <script>
   let nextIndex = {{ (config.ringi.filters or [])|length }};
+
+  // 対象オブジェクトの絞り込み。標準オブジェクトは千件以上あるため既定で隠す。
+  function filterObjects() {
+    const sel = document.getElementById('object_api_name');
+    if (!sel || sel.tagName !== 'SELECT') return;
+    const showAll = document.getElementById('show_all_objects').checked;
+    const q = (document.getElementById('object_filter').value || '').trim().toLowerCase();
+    let shown = 0;
+    for (const opt of sel.options) {
+      const relevant = opt.dataset.relevant === '1';
+      const matches = !q || (opt.dataset.search || '').includes(q);
+      // 選択中のものは、条件に合わなくても隠さない
+      const visible = (showAll || relevant || opt.selected) && matches;
+      opt.hidden = !visible;
+      if (visible) shown++;
+    }
+    const note = document.getElementById('object_count');
+    if (note) {
+      note.textContent = q
+        ? `「${q}」に一致する ${shown} 件を表示しています。`
+        : (showAll ? `${shown} 件すべてを表示しています。`
+                   : `この組織で作成・追加された ${shown} 件を表示しています。目的のものが無い場合は、上のチェックを入れてください。`);
+    }
+  }
+  document.addEventListener('DOMContentLoaded', filterObjects);
 
   function onFieldChange(sel, idx) {
     const opt = sel.selectedOptions[0];

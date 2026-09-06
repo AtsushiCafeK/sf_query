@@ -253,3 +253,45 @@ def test_リストを書き換えても後続のコメントが残る():
     out = _dump(data)
     assert "# 並び順の説明コメント" in out
     assert "ApplicationDate__c" in out
+
+
+# --- 対象オブジェクトの一覧（探せることを守る） -----------------------------
+class FakeSchemaConn:
+    """オブジェクト一覧だけ返す偽の接続。"""
+
+    def __init__(self, objects):
+        self._objects = objects
+
+    def list_objects(self):
+        return self._objects
+
+
+def test_対象になり得るオブジェクトに印が付く():
+    """組織には標準オブジェクトが千件以上あり、そのままでは目的のものを探せない。"""
+    import schema
+    schema.clear_cache()
+    conn = FakeSchemaConn([
+        {"name": "Account", "label": "取引先", "custom": False, "queryable": True},
+        {"name": "Ringi__c", "label": "稟議", "custom": True, "queryable": True},
+        {"name": "teamspirit__Ringi__c", "label": "稟議申請", "custom": True, "queryable": True},
+        {"name": "AccountFeed", "label": "取引先フィード", "custom": False, "queryable": True},
+        {"name": "NotQueryable", "label": "対象外", "custom": True, "queryable": False},
+    ])
+    objs = schema.list_objects(conn)
+    schema.clear_cache()
+
+    names = [o["name"] for o in objs]
+    assert "NotQueryable" not in names          # 検索できないものは出さない
+    assert names[0] in ("Ringi__c", "teamspirit__Ringi__c")   # 候補が先頭に来る
+
+    relevant = {o["name"] for o in objs if o["relevant"]}
+    assert relevant == {"Ringi__c", "teamspirit__Ringi__c"}
+    assert not any(o["relevant"] for o in objs if o["name"].startswith("Account"))
+
+
+def test_パッケージの名前空間を取り出せる():
+    """TeamSpirit のようなインストール済みパッケージを見分けるため。"""
+    import schema
+    assert schema._namespace("teamspirit__Ringi__c") == "teamspirit"
+    assert schema._namespace("Ringi__c") == ""
+    assert schema._namespace("Account") == ""

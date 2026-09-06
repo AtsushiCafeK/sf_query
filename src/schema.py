@@ -43,10 +43,21 @@ def clear_cache() -> None:
     _CACHE.clear()
 
 
+def _namespace(name: str) -> str:
+    """管理パッケージの名前空間を返す（例 teamspirit__Foo__c → teamspirit）。"""
+    if not name.endswith("__c"):
+        return ""
+    head = name[:-3]
+    return head.split("__", 1)[0] if "__" in head else ""
+
+
 def list_objects(conn) -> list[dict]:
     """設定画面のオブジェクト選択に使う一覧。
 
-    カスタムオブジェクトを先に並べる（探しているものが上に来るように）。
+    組織には標準オブジェクトが千件以上あり、そのまま並べると目的のものを
+    探せない。このツールの対象になるのは自組織で作ったカスタムオブジェクトか、
+    TeamSpirit のようなインストール済みパッケージのオブジェクトなので、
+    それらに `relevant` の印を付けて画面側で既定の絞り込みに使う。
     """
     def produce():
         items = []
@@ -54,12 +65,18 @@ def list_objects(conn) -> list[dict]:
             if not obj.get("queryable"):
                 continue
             name = obj.get("name", "")
+            custom = bool(obj.get("custom"))
+            ns = _namespace(name)
             items.append({
                 "name": name,
                 "label": obj.get("label") or name,
-                "custom": bool(obj.get("custom")),
+                "custom": custom,
+                "namespace": ns,
+                # 対象になり得るもの（カスタム or パッケージ製）
+                "relevant": custom or bool(ns),
             })
-        items.sort(key=lambda o: (not o["custom"], o["name"].lower()))
+        # 対象になり得るものを先に、名前順で並べる
+        items.sort(key=lambda o: (not o["relevant"], o["name"].lower()))
         return items
 
     return _cached("objects", produce)
