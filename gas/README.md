@@ -12,13 +12,13 @@
 | `SalesforceService.gs` | OAuth 認証、REST API の GET、エラー文言 |
 | `config.gs` | 「設定」シートの作成・読み取り・SOQL の簡易検証 |
 | `Query.gs` | クエリ実行（ページング）、入れ子の平坦化、シート出力 |
-| `OAuth2.gs`（**リポジトリには含めない**） | [apps-script-oauth2](https://github.com/googleworkspace/apps-script-oauth2) の `dist/OAuth2.gs` を無改変で貼り付ける（Apache-2.0） |
+| `OAuth2.gs` | [apps-script-oauth2](https://github.com/googleworkspace/apps-script-oauth2) の `dist/OAuth2.gs` を無改変で同梱（Apache-2.0）。ライブラリ追加が使えない場合の予備 |
 
 ## セットアップ
 
 1. スプレッドシートの「拡張機能 → Apps Script」に、上記ファイルを同名で作成して貼り付ける。
-   `OAuth2.gs` は上記リポジトリの `dist/OAuth2.gs` をそのまま貼り付ける
-   （ライブラリ追加でも可。スクリプトID: `1B7FSrk5Zi6L1rSxxTDgDEUsPzlukDsi4KGuTMorsTQHhGBzBkMun4iDF`、識別子は `OAuth2`）。
+   `OAuth2.gs` も同名で貼り付ける（同梱版を使う場合、ライブラリ追加は不要）。
+   ライブラリ追加で使う場合は `OAuth2.gs` を貼らず、次を指定する（スクリプトID: `1B7FSrk5Zi6L1rSxxTDgDEUsPzlukDsi4KGuTMorsTQHhGBzBkMun4iDF`、識別子は `OAuth2`）。
 2. Salesforce に **外部クライアントアプリ**（または接続アプリ）を作成する。
    - OAuth を有効化。スコープ: `api` / `refresh_token` / `offline_access`
    - コールバックURL: メニュー「Salesforce → コールバックURLを表示」で出る値
