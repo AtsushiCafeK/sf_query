@@ -176,6 +176,17 @@ ringi:
 
 自由文字列で検索したいときは「SOQLを直接入力」タブを使う。
 
+## 関連ツール：GAS版（スプレッドシート出力）
+
+セルに書いたSOQLを実行し、**結果の一覧をスプレッドシートに書き出す**だけの軽量版を
+[gas/](gas/) に置いている。添付ファイルのダウンロードは行わない。
+
+- 認証は本体と同じ **OAuth 2.0 + PKCE**。既存の接続アプリにコールバックURLを1行足すだけで使える
+- 利用者ごとに自分のSalesforceアカウントでログインし、その人が見られるデータだけ取得する
+- ブラウザだけで完結するため、Pythonの導入が難しい相手にも配れる
+
+手順は 👉 [gas/README.md](gas/README.md)
+
 ## アーキテクチャ
 
 ```
@@ -276,4 +287,5 @@ sf sobject describe --sobject <オブジェクトAPI名>
 - [SOQL / スキーマ探索 チートシート](docs/03_soql_cheatsheet.md)
 - [OAuth 2.0 接続設定（接続アプリの作成）](docs/04_oauth_setup.md)
 - [設定ガイド（管理者向け）](docs/05_settings_guide.md)
+- [GAS版：SOQL→スプレッドシート](gas/README.md)
 - [変更履歴（CHANGELOG）](CHANGELOG.md)
