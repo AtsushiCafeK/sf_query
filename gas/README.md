@@ -14,7 +14,8 @@
 | `Config.gs` | 設定シートの読み書き（初回に自動作成） |
 | `SalesforceService.gs` | OAuth認証（PKCE）とREST呼び出し |
 | `Query.gs` | SOQL実行・入れ子項目の平坦化・シート書き出し |
-| `appsscript.json` | マニフェスト（ライブラリ・権限） |
+| `OAuth2.gs` | OAuth2ライブラリ本体（同梱。[apps-script-oauth2](https://github.com/googleworkspace/apps-script-oauth2) / Apache-2.0） |
+| `appsscript.json` | マニフェスト（権限） |
 
 ---
 
@@ -24,22 +25,35 @@
 
 1. 新しいスプレッドシートを作る（空でよい）
 2. **拡張機能 → Apps Script** を開く
-3. 既定の `コード.gs` を消し、このフォルダの `.gs` を4つとも貼り付ける
-   （ファイル名は任意だが、`Code` / `Config` / `SalesforceService` / `Query` と分けると分かりやすい）
+3. 既定の `コード.gs` を消し、このフォルダの `.gs` を**5つとも**貼り付ける
 
-### 2. OAuth2 ライブラリを追加
+| 作るファイル名 | 貼り付ける内容 |
+|---|---|
+| `Code` | `Code.gs` |
+| `Config` | `Config.gs` |
+| `SalesforceService` | `SalesforceService.gs` |
+| `Query` | `Query.gs` |
+| `OAuth2` | `OAuth2.gs`（**ライブラリ本体。これも貼る**） |
 
-Apps Script の左メニュー **ライブラリ ＋** で、次のIDを追加する。
+ファイルの追加は、左の **ファイル ＋ → スクリプト** から行う。
 
-```
-1B7FSrk5Zi6L1rSxxTDgDEUsPzlukDsi4KGuTMorsTQHhGBzBkMun4iDF
-```
+> **ライブラリの追加操作は不要。** `OAuth2.gs` を貼るだけで
+> `OAuth2.createService(...)` が使えるようになる（ファイル末尾でグローバルに公開される）。
+>
+> <details><summary>ライブラリとして追加したい場合（任意）</summary>
+>
+> `OAuth2.gs` を貼らず、左メニューの **ライブラリ ＋** に次のスクリプトIDを入力して
+> 「検索」→「追加」でもよい。参照名は `OAuth2` のままにする。
+>
+> ```
+> 1B7FSrk5Zi6L1rSxxTDgDEUsPzlukDsi4KGuTMorsTQHhGBzBkMun4iDF
+> ```
+>
+> ただし**このIDで検索してもヒットしないことがある**ため、同梱ファイルを貼る方法を既定としている。
+> （公式READMEの手順は旧エディタの「リソース > ライブラリ」のままで、現行エディタとは操作が異なる）
+> </details>
 
-ID（参照名）は **`OAuth2`** のままにする。バージョンは最新を選ぶ。
-
-> `appsscript.json` を直接編集してもよい（マニフェストを表示する設定が必要）。
-
-### 3. コールバックURLを接続アプリに登録
+### 2. コールバックURLを接続アプリに登録
 
 1. スプレッドシートを開き直すと **「Salesforce」メニュー** が出る
 2. **Salesforce → コールバックURLを表示** を選び、表示されたURLをコピー
@@ -57,7 +71,7 @@ ID（参照名）は **`OAuth2`** のままにする。バージョンは最新�
    > 既存の接続アプリをそのまま使える。新規作成は不要。
    > 反映に最大10分かかる。
 
-### 4. 設定シートを埋める
+### 3. 設定シートを埋める
 
 **Salesforce → 設定シートを作成** を選ぶと「設定」シートができる。
 
@@ -70,7 +84,7 @@ ID（参照名）は **`OAuth2`** のままにする。バージョンは最新�
 | 最大取得件数 | 安全のための上限（既定 5000） |
 | **SOQL** | 実行したいクエリ |
 
-### 5. 接続して実行
+### 4. 接続して実行
 
 1. **Salesforce → Salesforceに接続** → リンクを開いてログイン・許可
 2. **Salesforce → SOQLを実行**
@@ -129,9 +143,24 @@ SOQL の書き方は [SOQLチートシート](../docs/03_soql_cheatsheet.md) を
 
 | 症状 | 原因と対処 |
 |---|---|
-| `redirect_uri_mismatch` | 接続アプリのコールバックURLに、GASのURLが登録されていない。手順3を確認（反映に最大10分） |
+| `redirect_uri_mismatch` | 接続アプリのコールバックURLに、GASのURLが登録されていない。手順2を確認（反映に最大10分） |
 | `invalid_client_id` | コンシューマー鍵の貼り間違い |
-| `OAuth2 is not defined` | ライブラリが追加されていない。手順2を確認（参照名は `OAuth2`） |
+| `OAuth2 is not defined` | `OAuth2.gs` を貼り忘れている。手順1の表を確認 |
+| ライブラリIDで検索してもヒットしない | 同梱の `OAuth2.gs` を貼れば**ライブラリ追加は不要**。手順1を参照 |
 | 認証の有効期限が切れています | 「認証を解除」してから接続し直す |
 | SOQL に存在しない項目… | 項目名の綴り違い。`sf sobject describe` か、本体ツールの設定画面で確認できる |
 | メニューが出ない | スプレッドシートを開き直す（`onOpen` は開いたときに動く） |
+
+---
+
+## 動作確認（開発者向け）
+
+GASのサービスを差し替えた偽環境で、ロジックを検証できる。
+**Googleアカウントもスプレッドシートも不要**。
+
+```bash
+node gas/test/test_gas.js
+```
+
+設定の読み取り、SOQL検証、入れ子項目の平坦化、ページング、打ち切り、
+エラー文言、シート書き出し、同梱 `OAuth2.gs` の公開とPKCEの有無を確認する。

@@ -207,4 +207,31 @@ check('# をエンコード', calls[0].indexOf('%23') !== -1 && calls[0].indexOf
 check('APIバージョンを使う', calls[0].indexOf('/v60.0/query/') !== -1);
 
 console.log('\n結果: ' + pass + ' 件成功, ' + fail + ' 件失敗');
+
+// --- 10. 同梱した OAuth2.gs が「貼り付けるだけ」で使えるか ----------------
+// ライブラリとして追加する代わりにファイルを貼る手順にしたため、
+// 実物を読み込んでグローバル公開とPKCEの有無を確かめる。
+console.log('\n【10】同梱 OAuth2.gs（貼り付け方式）');
+(function () {
+  const sandbox = { console };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(path.join(GAS_DIR, 'OAuth2.gs'), 'utf8'),
+                  sandbox, { filename: 'OAuth2.gs' });
+
+  check('グローバルに OAuth2 が定義される', typeof sandbox.OAuth2 === 'object');
+  check('createService がある', typeof sandbox.OAuth2.createService === 'function');
+
+  const svc = sandbox.OAuth2.createService('t');
+  check('generateCodeVerifier がある（PKCE）', typeof svc.generateCodeVerifier === 'function');
+  check('setCodeChallengeMethod がある', typeof svc.setCodeChallengeMethod === 'function');
+  check('本体が使うメソッドが揃っている',
+    ['setAuthorizationBaseUrl', 'setTokenUrl', 'setClientId', 'setClientSecret',
+     'setCallbackFunction', 'setPropertyStore', 'setScope', 'hasAccess',
+     'getAccessToken', 'getToken', 'getRedirectUri', 'reset',
+     'handleCallback', 'getAuthorizationUrl']
+      .every(function (m) { return typeof svc[m] === 'function'; }));
+})();
+
+console.log('\n最終結果: ' + pass + ' 件成功, ' + fail + ' 件失敗');
 process.exit(fail ? 1 : 0);
