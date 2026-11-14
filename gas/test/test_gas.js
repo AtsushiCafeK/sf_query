@@ -40,6 +40,8 @@ function fakeSheet(name) {
           return out;
         },
         setValue(v) { data[r - 1] = data[r - 1] || []; data[r - 1][c - 1] = v; return this; },
+        getValue() { return (data[r - 1] || [])[c - 1] ?? ''; },
+        setNumberFormat() { return this; },
         setFontWeight() { return this; }, setBackground() { return this; },
         setFontColor() { return this; }, setWrap() { return this; },
       };

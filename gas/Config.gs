@@ -58,6 +58,9 @@ function getOrCreateConfigSheet() {
     .setFontColor('#ffffff');
 
   var rows = CONFIG_ROWS.map(function (r) { return [r[0], r[1], r[2]]; });
+  // 値の列は書式なしテキストにする。
+  // 既定のままだと「60.0」が数値の 60 に変換され、APIバージョンが壊れる。
+  sheet.getRange(2, 2, rows.length, 1).setNumberFormat('@');
   sheet.getRange(2, 1, rows.length, 3).setValues(rows);
 
   sheet.getRange(2, 1, rows.length, 1).setFontWeight('bold');
@@ -112,7 +115,7 @@ function getConfig() {
   return {
     loginUrl: loginUrl,
     clientId: clientId,
-    apiVersion: raw['APIバージョン'] || DEFAULT_API_VERSION,
+    apiVersion: normalizeApiVersion_(raw['APIバージョン']),
     outputSheet: raw['出力先シート名'] || DEFAULT_OUTPUT_SHEET,
     maxRecords: (isNaN(maxRecords) || maxRecords <= 0) ? 5000 : maxRecords,
     soql: raw['SOQL'],
@@ -162,15 +165,58 @@ function addMissingConfigRows_(sheet) {
       })
     : [];
 
+  repairApiVersionCell_(sheet, existing);
+
   var missing = CONFIG_ROWS.filter(function (row) {
     return existing.indexOf(row[0]) === -1;
   });
   if (!missing.length) { return; }
 
   var startRow = lastRow + 1;
+  sheet.getRange(startRow, 2, missing.length, 1).setNumberFormat('@');
   sheet.getRange(startRow, 1, missing.length, 3)
     .setValues(missing.map(function (r) { return [r[0], r[1], r[2]]; }));
   sheet.getRange(startRow, 1, missing.length, 1).setFontWeight('bold');
   sheet.getRange(startRow, 3, missing.length, 1).setFontColor('#666666');
+}
+
+/**
+ * APIバージョンを「60.0」の形にそろえる。
+ *
+ * スプレッドシートは「60.0」を数値の 60 と解釈して保存することがあり、
+ * そのまま使うと /services/data/v60/ になって Salesforce が 404 を返す。
+ * 「60」「v60.0」「60.0」のどれで入っていても受け付ける。
+ *
+ * @param {*} raw 設定シートの値
+ * @return {string} 例: "60.0"
+ */
+function normalizeApiVersion_(raw) {
+  var s = String(raw == null ? '' : raw).trim().replace(/^v/i, '');
+  if (!s) { return DEFAULT_API_VERSION; }
+  if (/^\d+$/.test(s)) { return s + '.0'; }
+  if (/^\d+\.\d+$/.test(s)) { return s; }
+  throw new Error(
+    'APIバージョンは 60.0 のような形式で入力してください: ' + raw
+  );
+}
+
+/**
+ * すでに数値化されてしまった APIバージョンのセルを、テキストの「60.0」に直す。
+ *
+ * 以前のバージョンで作った設定シートは書式が自動判定のため、
+ * 数値の 60 になっていることがある。
+ *
+ * @param {Sheet} sheet 設定シート
+ * @param {Array<string>} labels 2行目以降のA列の項目名
+ * @private
+ */
+function repairApiVersionCell_(sheet, labels) {
+  var idx = labels.indexOf('APIバージョン');
+  if (idx === -1) { return; }
+  var cell = sheet.getRange(idx + 2, 2);
+  var value = cell.getValue();
+  if (typeof value !== 'number') { return; }
+  cell.setNumberFormat('@');
+  cell.setValue(normalizeApiVersion_(value));
 }
 

@@ -38,6 +38,8 @@ function fakeSheet(name) {
           return out;
         },
         setValue(v) { data[r - 1] = data[r - 1] || []; data[r - 1][c - 1] = v; return this; },
+        getValue() { return (data[r - 1] || [])[c - 1] ?? ''; },
+        setNumberFormat() { return this; },
         setNotes(n) { notes.push(n); return this; },
         setFontWeight() { return this; }, setBackground() { return this; },
         setFontColor() { return this; }, setWrap() { return this; },
@@ -327,6 +329,51 @@ console.log('\n【13】項目名で読むので並び順に依存しない');
     cfg.importObject === 'Other__c' && cfg.apiVersion === '61.0',
     cfg.importObject + ' / ' + cfg.apiVersion);
 })();
+
+console.log('\n【14】APIバージョンの正規化（HTTP 404 の原因）');
+// スプレッドシートは「60.0」を数値の 60 にしてしまい、/v60/ で 404 になった
+check('数値 60 → 60.0', normalizeApiVersion_(60) === '60.0', normalizeApiVersion_(60));
+check('文字列 "60" → 60.0', normalizeApiVersion_('60') === '60.0');
+check('60.0 はそのまま', normalizeApiVersion_('60.0') === '60.0');
+check('数値 61.5 → 61.5', normalizeApiVersion_(61.5) === '61.5');
+check('v60.0 の v を除く', normalizeApiVersion_('v60.0') === '60.0');
+check('空なら既定値', normalizeApiVersion_('') === '60.0');
+try { normalizeApiVersion_('sixty'); check('不正な値を拒否', false); }
+catch (e) { check('不正な値を拒否', /60\.0 のような形式/.test(e.message), e.message); }
+
+(function () {
+  for (const k of Object.keys(sheets)) delete sheets[k];
+  const sh = fakeSheet('設定');
+  sheets['設定'] = sh;
+  sh.getRange(1, 1, 4, 3).setValues([
+    ['設定項目', '値', '説明'],
+    ['コンシューマー鍵', 'K', ''],
+    ['APIバージョン', 60, ''],            // 数値化されてしまった状態
+    ['登録先オブジェクト', 'Ringi__c', ''],
+  ]);
+  const cfg = getConfig();
+  check('数値化されたセルでも 60.0 で読める', cfg.apiVersion === '60.0', cfg.apiVersion);
+  check('セルが自動で直る', sh.getRange(3, 2).getValue() === '60.0', sh.getRange(3, 2).getValue());
+})();
+
+(function () {
+  // 実際のURLが /v60.0/ になること
+  for (const k of Object.keys(sheets)) delete sheets[k];
+  const sh = fakeSheet('設定');
+  sheets['設定'] = sh;
+  sh.getRange(1, 1, 3, 3).setValues([
+    ['設定項目', '値', '説明'],
+    ['コンシューマー鍵', 'K', ''],
+    ['APIバージョン', 60, ''],
+  ]);
+  const urls = [];
+  const saved = globalThis.UrlFetchApp.fetch;
+  globalThis.UrlFetchApp.fetch = (url, opts) => { urls.push(url); return saved(url, opts); };
+  describeObject('Ringi__c');
+  globalThis.UrlFetchApp.fetch = saved;
+  check('describe のURLが v60.0', /\/services\/data\/v60\.0\/sobjects\/Ringi__c\/describe\/$/.test(urls[0]), urls[0]);
+})();
+
 
 console.log('\n最終結果: ' + pass + ' 件成功, ' + fail + ' 件失敗');
 process.exit(fail ? 1 : 0);
