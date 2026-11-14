@@ -14,6 +14,10 @@ function onOpen() {
     .createMenu('Salesforce')
     .addItem('SOQLを実行', 'runQuery')
     .addSeparator()
+    .addItem('登録シートを用意', 'setupImportSheet')
+    .addItem('一括登録を確認（ドライラン）', 'dryRunImport')
+    .addItem('一括登録を実行', 'runImport')
+    .addSeparator()
     .addItem('Salesforceに接続', 'showAuthorizationDialog')
     .addItem('接続状態を確認', 'showConnectionStatus')
     .addItem('認証を解除', 'disconnect')
@@ -144,4 +148,188 @@ function runQuery() {
     ss.toast('', 'SOQL実行', 1);  // 実行中トーストを消す
     ui.alert('エラー', e.message, ui.ButtonSet.OK);
   }
+}
+
+// ---------------------------------------------------------------------------
+// 一括登録（プロトタイプ）
+// ---------------------------------------------------------------------------
+
+/**
+ * 登録せずに、何が作られるかだけ確認する。
+ *
+ * 書き込みはやり直しが効かないため、まずこちらで中身を確かめる。
+ */
+function dryRunImport() {
+  var ui = SpreadsheetApp.getUi();
+  try {
+    var prepared = prepareImport_();
+    if (prepared.problems.length) {
+      ui.alert('登録できない内容があります（送信していません）',
+        formatProblems_(prepared.problems), ui.ButtonSet.OK);
+      return;
+    }
+
+    ui.alert('ドライランの結果',
+      '問題は見つかりませんでした。送信はしていません。\n\n' +
+      '対象オブジェクト: ' + prepared.objectName + '\n' +
+      '登録される件数  : ' + prepared.records.length + ' 件\n\n' +
+      '--- 1件目の内容 ---\n' + previewRecord_(prepared.records[0]) +
+      '\n\n問題なければ「一括登録を実行」を選んでください。',
+      ui.ButtonSet.OK);
+  } catch (e) {
+    ui.alert('エラー', e.message, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * シートの内容を Salesforce に登録する。
+ */
+function runImport() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  try {
+    var prepared = prepareImport_();
+    if (prepared.problems.length) {
+      ui.alert('登録できない内容があります（送信していません）',
+        formatProblems_(prepared.problems), ui.ButtonSet.OK);
+      return;
+    }
+
+    var answer = ui.alert('一括登録の確認',
+      prepared.objectName + ' に ' + prepared.records.length + ' 件のレコードを作成します。\n\n' +
+      'この操作は取り消せません。\n' +
+      '（1件でも失敗した場合は、全件が取り消されます）\n\n' +
+      '実行してよろしいですか？',
+      ui.ButtonSet.YES_NO);
+    if (answer !== ui.Button.YES) { return; }
+
+    ss.toast('Salesforce に登録しています…', '一括登録', -1);
+    var results = createRecords(prepared.records);
+    ss.toast('', '一括登録', 1);
+
+    var summary = writeImportResults_(prepared, results);
+    if (summary.failed === 0) {
+      ui.alert('登録しました',
+        summary.created + ' 件を作成しました。\n' +
+        '各行の「' + RESULT_ID_HEADER + '」列に、作成されたレコードIDを書き込みました。',
+        ui.ButtonSet.OK);
+    } else {
+      ui.alert('登録されませんでした',
+        summary.failed + ' 件でエラーがあったため、Salesforce 側で全件取り消されました。\n' +
+        '各行の「' + RESULT_STATUS_HEADER + '」列に理由を書き込みました。\n\n' +
+        '最初のエラー:\n' + summary.firstError,
+        ui.ButtonSet.OK);
+    }
+  } catch (e) {
+    ss.toast('', '一括登録', 1);
+    ui.alert('エラー', e.message, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * シートを読んで検証し、送信できる形にする（ドライランと本番で共通）。
+ * @private
+ */
+function prepareImport_() {
+  var cfg = getConfig();
+  var input = readImportRows();
+  var meta = describeObject(input.objectName);
+
+  if (!input.rows.length) {
+    throw new Error('登録するデータがありません。2行目以降に入力してください。');
+  }
+  if (input.rows.length > cfg.importLimit) {
+    throw new Error(
+      '一度に登録できるのは ' + cfg.importLimit + ' 件までです（' + input.rows.length + ' 件あります）。\n' +
+      '行を分けて実行してください。'
+    );
+  }
+
+  var validated = validateImportRows(input.rows, meta);
+  return {
+    objectName: input.objectName,
+    sheet: input.sheet,
+    headers: input.headers,
+    rows: input.rows,
+    records: validated.records,
+    problems: validated.problems
+  };
+}
+
+/**
+ * 検証結果を読みやすく整える（多すぎる場合は打ち切る）。
+ * @private
+ */
+function formatProblems_(problems) {
+  var shown = problems.slice(0, 15);
+  var text = shown.join('\n');
+  if (problems.length > shown.length) {
+    text += '\n… ほか ' + (problems.length - shown.length) + ' 件';
+  }
+  return text + '\n\n直してから、もう一度実行してください。';
+}
+
+/**
+ * 1件分の内容を確認用に文字列にする。
+ * @private
+ */
+function previewRecord_(record) {
+  var lines = [];
+  for (var key in record) {
+    if (key === 'attributes' || !record.hasOwnProperty(key)) { continue; }
+    lines.push('  ' + key + ': ' + record[key]);
+  }
+  return lines.join('\n');
+}
+
+/**
+ * 登録結果を各行に書き戻す。
+ *
+ * 間違えて登録したときに消せるよう、作成されたIDを必ず残す。
+ * @private
+ */
+function writeImportResults_(prepared, results) {
+  var sheet = prepared.sheet;
+  var headers = prepared.headers.slice();
+
+  function columnFor(name) {
+    var idx = headers.indexOf(name);
+    if (idx === -1) {
+      headers.push(name);
+      idx = headers.length - 1;
+      sheet.getRange(1, idx + 1).setValue(name).setFontWeight('bold')
+        .setBackground('#2c313a').setFontColor('#ffffff');
+    }
+    return idx + 1;
+  }
+
+  var idCol = columnFor(RESULT_ID_HEADER);
+  var statusCol = columnFor(RESULT_STATUS_HEADER);
+
+  var created = 0, failed = 0, firstError = '';
+  var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+
+  results.forEach(function (res, i) {
+    var row = prepared.rows[i].rowNumber;
+    if (res.success) {
+      created++;
+      sheet.getRange(row, idCol).setValue(res.id);
+      sheet.getRange(row, statusCol).setValue('登録成功 ' + stamp);
+    } else {
+      failed++;
+      var msg = (res.errors || []).map(function (e) {
+        return (e.statusCode ? '[' + e.statusCode + '] ' : '') + (e.message || '');
+      }).join(' / ') || 'エラー';
+      // allOrNone のため、他行の失敗で巻き添えになったものと区別する
+      if (msg.indexOf('ALL_OR_NONE') !== -1 || msg.indexOf('PROCESSING_HALTED') !== -1) {
+        msg = '他の行のエラーにより取り消されました';
+      } else if (!firstError) {
+        firstError = prepared.rows[i].rowNumber + '行目: ' + msg;
+      }
+      sheet.getRange(row, statusCol).setValue(msg);
+    }
+  });
+
+  return { created: created, failed: failed, firstError: firstError || '(なし)' };
 }

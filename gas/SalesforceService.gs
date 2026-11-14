@@ -127,3 +127,78 @@ function describeSalesforceError_(code, body) {
   }
   return 'Salesforce でエラーが発生しました (HTTP ' + code + ')\n' + detail;
 }
+
+/**
+ * Salesforce の REST API に POST する（レコード作成などの書き込み）。
+ *
+ * 読み取りと違い、やり直しが効かない操作なので呼び出し側で
+ * 事前検証とドライランを用意すること。
+ *
+ * @param {string} path  相対パス
+ * @param {Object} body  送信するJSON
+ * @return {Object|Array} 応答のJSON
+ */
+function salesforcePost(path, body) {
+  var service = getSalesforceService();
+  if (!service.hasAccess()) {
+    throw new Error(
+      'Salesforce に接続されていません。メニューの「Salesforce」→「Salesforceに接続」から認証してください。'
+    );
+  }
+
+  var response = UrlFetchApp.fetch(service.getToken().instance_url + path, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + service.getAccessToken() },
+    payload: JSON.stringify(body),
+    muteHttpExceptions: true
+  });
+
+  var code = response.getResponseCode();
+  var text = response.getContentText();
+
+  // composite/sobjects は各行の成否を 200 で返すため、本文は呼び出し側で見る
+  if (code === 200 || code === 201) {
+    return JSON.parse(text);
+  }
+  throw new Error(describeSalesforceError_(code, text));
+}
+
+/**
+ * オブジェクトの定義を、取り込みに必要な形に整えて返す。
+ *
+ * @param {string} objectName API名
+ * @return {{name: string, label: string, createable: Array<Object>}}
+ */
+function describeObject(objectName) {
+  var cfg = getConfig();
+  var described = salesforceGet(
+    '/services/data/v' + cfg.apiVersion + '/sobjects/' + objectName + '/describe/');
+
+  if (!described.createable) {
+    throw new Error(
+      objectName + ' はAPIからレコードを作成できない設定です。' +
+      '管理パッケージのオブジェクトではよくあるため、別の方法を検討してください。'
+    );
+  }
+
+  var createable = (described.fields || [])
+    .filter(function (f) { return f.createable; })
+    .map(function (f) {
+      var picklist = (f.picklistValues || [])
+        .filter(function (p) { return p.active; })
+        .map(function (p) { return p.value; });
+      return {
+        name: f.name,
+        label: f.label || f.name,
+        type: f.type,
+        // 既定値が入らず、空も許さない項目＝入力必須
+        required: (!f.nillable && !f.defaultedOnCreate),
+        picklist: picklist,
+        // 参照型やシステム項目は、ふつうシートに並べない
+        recommended: (f.type !== 'reference')
+      };
+    });
+
+  return { name: described.name, label: described.label, createable: createable };
+}

@@ -26,7 +26,11 @@ var CONFIG_ROWS = [
   ['最大取得件数', '5000',
    '安全のための上限。GASは1回の実行が6分までのため、大量件数は分けて取得する'],
   ['SOQL', 'SELECT Id, Name FROM Account ORDER BY Name LIMIT 100',
-   'ここに実行したいSOQLを書く（複数行可）']
+   'ここに実行したいSOQLを書く（複数行可）'],
+  ['登録先オブジェクト', 'Ringi__c',
+   '一括登録の対象。「登録シートを用意」でこのオブジェクトの列が作られる'],
+  ['一括登録の上限件数', '200',
+   '一度に登録できる上限。誤送信を防ぐための歯止め（Salesforceの仕様上の上限も200）']
 ];
 
 /** SOQL を書く行（1始まり。見出し行の次から数える） */
@@ -96,13 +100,17 @@ function getConfig() {
     throw new Error('ログインURLは https:// で始まる必要があります: ' + loginUrl);
   }
 
+  var importLimit = parseInt(raw['一括登録の上限件数'], 10);
+
   return {
     loginUrl: loginUrl,
     clientId: clientId,
     apiVersion: raw['APIバージョン'] || DEFAULT_API_VERSION,
     outputSheet: raw['出力先シート名'] || DEFAULT_OUTPUT_SHEET,
     maxRecords: (isNaN(maxRecords) || maxRecords <= 0) ? 5000 : maxRecords,
-    soql: raw['SOQL']
+    soql: raw['SOQL'],
+    importObject: raw['登録先オブジェクト'] || 'Ringi__c',
+    importLimit: (isNaN(importLimit) || importLimit <= 0) ? 200 : Math.min(importLimit, 200)
   };
 }
 
