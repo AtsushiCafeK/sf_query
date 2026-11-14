@@ -93,7 +93,9 @@ function salesforceGet(path) {
     return JSON.parse(body);
   }
 
-  throw new Error(describeSalesforceError_(code, body));
+  // 404 は「パスが違う」ことが多い。原因を追えるよう実際のURLを添える
+  throw new Error(describeSalesforceError_(code, body) +
+                  (code === 404 ? '\n\n実際に要求したURL:\n' + url : ''));
 }
 
 /**
@@ -124,6 +126,12 @@ function describeSalesforceError_(code, body) {
   }
   if (detail.indexOf('MALFORMED_QUERY') !== -1) {
     return 'SOQL の書き方に誤りがあります。\n' + detail;
+  }
+  if (code === 404) {
+    return 'Salesforce に該当するリソースがありません (HTTP 404)。\n' +
+           'オブジェクトのAPI名が間違っているか、APIバージョンがこの組織で' +
+           '使えない可能性があります。設定シートの「登録先オブジェクト」と' +
+           '「APIバージョン」を確認してください。\n' + detail;
   }
   return 'Salesforce でエラーが発生しました (HTTP ' + code + ')\n' + detail;
 }

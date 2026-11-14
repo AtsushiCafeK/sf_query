@@ -53,6 +53,8 @@ function fakeSheet(name) {
         })
       };
     },
+    getLastRow: () => data.length,
+    getLastColumn: () => Math.max(...data.map(r => (r || []).length), 0),
     setColumnWidth() {}, setFrozenRows() {}, autoResizeColumns() {},
   };
   return sheet;
@@ -278,5 +280,53 @@ try { describeObject('Ringi__c'); check('作成不可を検出', false); }
 catch (e) { check('作成不可を検出', /作成できない設定/.test(e.message), e.message); }
 DESCRIBE.createable = orig;
 
-console.log('\n結果: ' + pass + ' 件成功, ' + fail + ' 件失敗');
+console.log('\n小計: ' + pass + ' 件成功, ' + fail + ' 件失敗');
+
+console.log('\n【12】古い設定シートの移行（今回の不具合）');
+// 旧バージョンで作られた6行の設定シートに、新しい設定項目が足されるか
+(function () {
+  for (const k of Object.keys(sheets)) delete sheets[k];
+  const old = fakeSheet('設定');
+  sheets['設定'] = old;
+  old.getRange(1, 1, 7, 3).setValues([
+    ['設定項目', '値', '説明'],
+    ['ログインURL', 'https://login.salesforce.com', ''],
+    ['コンシューマー鍵', 'OLDKEY', ''],
+    ['APIバージョン', '60.0', ''],
+    ['出力先シート名', '結果', ''],
+    ['最大取得件数', '5000', ''],
+    ['SOQL', 'SELECT Id FROM Ringi__c', ''],
+  ]);
+
+  const cfg = getConfig();            // 読む過程で移行が走る
+  const keys = old.getDataRange().getValues().slice(1).map(r => r[0]);
+  check('登録先オブジェクトの行が足される', keys.indexOf('登録先オブジェクト') !== -1, keys);
+  check('上限件数の行が足される', keys.indexOf('一括登録の上限件数') !== -1);
+  check('既存の値を壊さない', cfg.clientId === 'OLDKEY', cfg.clientId);
+  check('既定値が入る', cfg.importObject === 'Ringi__c', cfg.importObject);
+
+  getConfig();                        // 2回目で重複して足さないこと
+  const keys2 = old.getDataRange().getValues().slice(1).map(r => r[0]);
+  const dup = keys2.filter(k => k === '登録先オブジェクト').length;
+  check('重複して足さない', dup === 1, dup);
+})();
+
+console.log('\n【13】項目名で読むので並び順に依存しない');
+(function () {
+  for (const k of Object.keys(sheets)) delete sheets[k];
+  const sh = fakeSheet('設定');
+  sheets['設定'] = sh;
+  sh.getRange(1, 1, 4, 3).setValues([
+    ['設定項目', '値', '説明'],
+    ['登録先オブジェクト', 'Other__c', ''],
+    ['コンシューマー鍵', 'K', ''],
+    ['APIバージョン', '61.0', ''],
+  ]);
+  const cfg = getConfig();
+  check('並び順が違っても正しく読む',
+    cfg.importObject === 'Other__c' && cfg.apiVersion === '61.0',
+    cfg.importObject + ' / ' + cfg.apiVersion);
+})();
+
+console.log('\n最終結果: ' + pass + ' 件成功, ' + fail + ' 件失敗');
 process.exit(fail ? 1 : 0);

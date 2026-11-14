@@ -44,6 +44,8 @@ function fakeSheet(name) {
         setFontColor() { return this; }, setWrap() { return this; },
       };
     },
+    getLastRow: () => data.length,
+    getLastColumn: () => Math.max(...data.map(r => (r || []).length), 0),
     setColumnWidth() {}, setFrozenRows() {}, autoResizeColumns() {},
   };
 }

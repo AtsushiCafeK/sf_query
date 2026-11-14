@@ -44,6 +44,9 @@ function getOrCreateConfigSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(CONFIG_SHEET_NAME);
   if (sheet) {
+    // 機能追加で設定項目が増えた場合、既存のシートに足りない行を補う。
+    // これをしないと、古いシートを使っている人に新しい設定が出てこない。
+    addMissingConfigRows_(sheet);
     return sheet;
   }
 
@@ -76,12 +79,16 @@ function getOrCreateConfigSheet() {
  */
 function getConfig() {
   var sheet = getOrCreateConfigSheet();
-  var values = sheet.getRange(2, 2, CONFIG_ROWS.length, 1).getValues();
+  var lastRow = Math.max(sheet.getLastRow(), 1);
 
+  // 行の位置ではなく「設定項目名」で引く。項目を増減しても読み違えないようにするため。
   var raw = {};
-  CONFIG_ROWS.forEach(function (row, i) {
-    raw[row[0]] = String(values[i][0] == null ? '' : values[i][0]).trim();
-  });
+  if (lastRow >= 2) {
+    sheet.getRange(2, 1, lastRow - 1, 2).getValues().forEach(function (r) {
+      var key = String(r[0] || '').trim();
+      if (key) { raw[key] = String(r[1] == null ? '' : r[1]).trim(); }
+    });
+  }
 
   // スクリプトプロパティがあればそちらを優先（共有シートで鍵を隠したい場合）
   var fromProps = PropertiesService.getScriptProperties()
@@ -137,3 +144,33 @@ function getValidatedSoql() {
   }
   return soql;
 }
+
+/**
+ * 既存の設定シートに、まだ無い設定項目の行を追加する。
+ *
+ * 設定項目を増やしたときに、古いシートのままだと新機能が使えなくなるため。
+ * 既に入力済みの値には触らない。
+ *
+ * @param {Sheet} sheet 設定シート
+ * @private
+ */
+function addMissingConfigRows_(sheet) {
+  var lastRow = Math.max(sheet.getLastRow(), 1);
+  var existing = lastRow >= 2
+    ? sheet.getRange(2, 1, lastRow - 1, 1).getValues().map(function (r) {
+        return String(r[0] || '').trim();
+      })
+    : [];
+
+  var missing = CONFIG_ROWS.filter(function (row) {
+    return existing.indexOf(row[0]) === -1;
+  });
+  if (!missing.length) { return; }
+
+  var startRow = lastRow + 1;
+  sheet.getRange(startRow, 1, missing.length, 3)
+    .setValues(missing.map(function (r) { return [r[0], r[1], r[2]]; }));
+  sheet.getRange(startRow, 1, missing.length, 1).setFontWeight('bold');
+  sheet.getRange(startRow, 3, missing.length, 1).setFontColor('#666666');
+}
+
