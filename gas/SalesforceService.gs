@@ -24,8 +24,11 @@ function getSalesforceService() {
     .setAuthorizationBaseUrl(cfg.loginUrl + '/services/oauth2/authorize')
     .setTokenUrl(cfg.loginUrl + '/services/oauth2/token')
     .setClientId(cfg.clientId)
-    // PKCE の公開クライアント構成のため、シークレットは持たない
-    .setClientSecret('')
+    // 既定は PKCE の公開クライアント構成（シークレットなし）。
+    // 接続アプリ側で秘密が必須の設定になっている場合に限り、スクリプトプロパティ
+    // SALESFORCE_CLIENT_SECRET に入れると送信する。シートには置かない。
+    .setClientSecret(
+      PropertiesService.getScriptProperties().getProperty('SALESFORCE_CLIENT_SECRET') || '')
     .setCallbackFunction('authCallback')
     .setPropertyStore(PropertiesService.getUserProperties())
     .setScope('api refresh_token offline_access');
@@ -42,13 +45,89 @@ function getSalesforceService() {
  * @return {HtmlOutput} 利用者に見せる結果画面
  */
 function authCallback(request) {
-  var authorized = getSalesforceService().handleCallback(request);
-  var message = authorized
-    ? '接続しました。このタブを閉じて、スプレッドシートに戻ってください。'
-    : '接続をキャンセルしました。このタブを閉じてください。';
-  return HtmlService.createHtmlOutput(
-    '<p style="font-family:sans-serif; font-size:15px;">' + message + '</p>'
-  );
+  var style = 'font-family:sans-serif; font-size:15px; line-height:1.7; padding:8px;';
+  try {
+    var authorized = getSalesforceService().handleCallback(request);
+    var message = authorized
+      ? '接続しました。このタブを閉じて、スプレッドシートに戻ってください。'
+      : '接続をキャンセルしました。このタブを閉じてください。';
+    return HtmlService.createHtmlOutput('<p style="' + style + '">' + message + '</p>');
+  } catch (e) {
+    // 生のエラー画面では原因が分からないため、確認項目を添えて返す
+    return HtmlService.createHtmlOutput(
+      '<div style="' + style + '">' +
+      '<p><strong>接続に失敗しました。</strong></p>' +
+      '<p style="color:#b00020;">' + escapeHtml_(e.message) + '</p>' +
+      authFailureHints_(e.message) +
+      '</div>');
+  }
+}
+
+/**
+ * 認証エラーの内容に応じて、確認すべき項目を返す（HTML）。
+ * \nparam {string} message エラーメッセージ
+ * \nreturn {string}
+ * \nprivate
+ */
+function authFailureHints_(message) {
+  var items = [];
+  if (/invalid_client/.test(message)) {
+    items.push('設定シートの「コンシューマー鍵」が、接続アプリのものと一致しているか（前後の空白・貼り間違い）');
+    items.push('接続アプリ側の「Webサーバーフローの秘密が必要」「更新トークンフローの秘密が必要」の設定。' +
+               '秘密を必要とする設定になっている場合は、プロジェクトの設定 → スクリプト プロパティに ' +
+               '<code>SALESFORCE_CLIENT_SECRET</code> を登録する');
+    items.push('接続アプリを編集した直後は、反映まで最大10分かかる');
+    items.push('ログインURL（本番・開発組織 / Sandbox）が接続先と合っているか');
+  } else if (/redirect_uri/.test(message)) {
+    items.push('接続アプリのコールバックURLに、メニュー「コールバックURLを表示」のURLが登録されているか');
+  } else if (/invalid_grant/.test(message)) {
+    items.push('「認証を解除」してから、もう一度「Salesforceに接続」をやり直す');
+  }
+  if (!items.length) { return ''; }
+  return '<p>確認してください:</p><ul>' + items.map(function (t) {
+    return '<li>' + t + '</li>';
+  }).join('') + '</ul>';
+}
+
+/**
+ * HTML に埋め込む文字列をエスケープする。
+ * エラー本文には Salesforce の応答が入るため、そのまま埋め込まない。
+ * \nparam {string} text
+ * \nreturn {string}
+ * \nprivate
+ */
+function escapeHtml_(text) {
+  return String(text == null ? '' : text)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+/**
+ * 直前の認証（トークン更新）が失敗していれば、その理由を返す。
+ *
+ * ライブラリの hasAccess() は更新に失敗しても例外を投げず false を返すだけなので、
+ * 利用者には「未接続」としか見えない。理由を取り出して伝える。
+ *
+ * \nparam {Object} service 認証サービス
+ * \nreturn {string} 理由。無ければ空文字
+ */
+function authFailureReason_(service) {
+  var e = service.getLastError();
+  return e ? String(e.message || e) : '';
+}
+
+/**
+ * 「接続されていません」のメッセージ。更新に失敗していれば理由を添える。
+ * \nparam {Object} service 認証サービス
+ * \nreturn {string}
+ * \nprivate
+ */
+function notConnectedMessage_(service) {
+  var base = 'Salesforce に接続されていません。メニューの「Salesforce」→「Salesforceに接続」から認証してください。';
+  var reason = authFailureReason_(service);
+  return reason
+    ? base + '\n\n' + '直前の認証の更新に失敗しています:\n' + reason
+    : base;
 }
 
 /**
@@ -75,9 +154,7 @@ function getRedirectUri() {
 function salesforceGet(path) {
   var service = getSalesforceService();
   if (!service.hasAccess()) {
-    throw new Error(
-      'Salesforce に接続されていません。メニューの「Salesforce」→「Salesforceに接続」から認証してください。'
-    );
+    throw new Error(notConnectedMessage_(service));
   }
 
   var url = service.getToken().instance_url + path;
@@ -149,9 +226,7 @@ function describeSalesforceError_(code, body) {
 function salesforcePost(path, body) {
   var service = getSalesforceService();
   if (!service.hasAccess()) {
-    throw new Error(
-      'Salesforce に接続されていません。メニューの「Salesforce」→「Salesforceに接続」から認証してください。'
-    );
+    throw new Error(notConnectedMessage_(service));
   }
 
   var response = UrlFetchApp.fetch(service.getToken().instance_url + path, {

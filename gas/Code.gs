@@ -54,13 +54,20 @@ function showAuthorizationDialog() {
       return;
     }
 
+    var reason = authFailureReason_(service);
+    var reasonHtml = reason
+      ? '<p style="font-family:sans-serif; font-size:12px; color:#b00020;">' +
+        '直前の認証の更新に失敗しています:<br>' + escapeHtml_(reason) + '</p>'
+      : '';
+
     var html = HtmlService.createHtmlOutput(
+      reasonHtml +
       '<p style="font-family:sans-serif; font-size:14px; line-height:1.7;">' +
       '下のリンクを開いて、Salesforce にログインしてください。<br>' +
       '許可が終わったらこのダイアログを閉じて、もう一度「SOQLを実行」を選びます。</p>' +
       '<p><a href="' + service.getAuthorizationUrl() + '" target="_blank" ' +
       'style="font-family:sans-serif; font-size:15px;">Salesforce にログインする</a></p>'
-    ).setWidth(420).setHeight(160);
+    ).setWidth(460).setHeight(reason ? 260 : 160);
 
     ui.showModalDialog(html, 'Salesforce に接続');
   } catch (e) {
@@ -76,7 +83,9 @@ function showConnectionStatus() {
   try {
     var service = getSalesforceService();
     if (!service.hasAccess()) {
-      ui.alert('接続状態', '未接続です。\n「Salesforceに接続」から認証してください。', ui.ButtonSet.OK);
+      var why = authFailureReason_(service);
+      ui.alert('接続状態', '未接続です。\n「Salesforceに接続」から認証してください。' +
+        (why ? '\n\n直前の認証の更新に失敗しています:\n' + why : ''), ui.ButtonSet.OK);
       return;
     }
     var info = salesforceGet('/services/oauth2/userinfo');

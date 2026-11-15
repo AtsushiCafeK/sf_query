@@ -60,8 +60,9 @@ const calls = [];
 globalThis.SpreadsheetApp = { getActiveSpreadsheet: () => ss, getUi: () => ({ alert: () => {}, ButtonSet: {} }) };
 globalThis.PropertiesService = {
   getUserProperties: () => ({ getProperty: () => null, setProperty: () => {} }),
-  getScriptProperties: () => ({ getProperty: () => null }),
+  getScriptProperties: () => ({ getProperty: (k) => (scriptProps[k] ?? null) }),
 };
+const scriptProps = {};
 globalThis.UrlFetchApp = {
   fetch: (url) => { calls.push(url); return fakeResponse(); },
 };
@@ -70,19 +71,27 @@ globalThis.Logger = { log: () => {} };
 
 let fakeResponse = () => ({ getResponseCode: () => 200, getContentText: () => '{}' });
 
-// OAuth2 ライブラリの偽物（hasAccess は常に true）
+// OAuth2 ライブラリの偽物。authState で挙動を切り替える。
 let tokenInstanceUrl = 'https://example.my.salesforce.com';
+const authState = { hasAccess: true, lastError: null, callbackError: null, secret: null };
 globalThis.OAuth2 = {
   createService: () => {
     const s = {
       setAuthorizationBaseUrl() { return s; }, setTokenUrl() { return s; },
-      setClientId() { return s; }, setClientSecret() { return s; },
+      setClientId() { return s; },
+      setClientSecret(v) { authState.secret = v; return s; },
       setCallbackFunction() { return s; }, setPropertyStore() { return s; },
       setScope() { return s; }, generateCodeVerifier() { return s; },
-      hasAccess: () => true, getAccessToken: () => 'TOKEN',
+      hasAccess: () => authState.hasAccess, getAccessToken: () => 'TOKEN',
+      getLastError: () => authState.lastError,
       getToken: () => ({ instance_url: tokenInstanceUrl }),
       getRedirectUri: () => 'https://script.google.com/macros/d/ID/usercallback',
-      reset() {}, handleCallback: () => true, getAuthorizationUrl: () => 'https://auth',
+      reset() {},
+      handleCallback: () => {
+        if (authState.callbackError) { throw authState.callbackError; }
+        return true;
+      },
+      getAuthorizationUrl: () => 'https://auth',
     };
     return s;
   },
@@ -236,6 +245,51 @@ console.log('\n【10】同梱 OAuth2.gs（貼り付け方式）');
      'handleCallback', 'getAuthorizationUrl']
       .every(function (m) { return typeof svc[m] === 'function'; }));
 })();
+
+console.log('\n【11】トークン更新の失敗が利用者に見える');
+// hasAccess() は更新に失敗しても例外を投げず false を返すだけ。理由を伝える。
+authState.hasAccess = false;
+authState.lastError = new Error('Error retrieving token: invalid_client, invalid client credentials');
+try { salesforceGet('/x'); check('未接続でエラーにする', false); }
+catch (e) {
+  check('未接続としてエラーにする', /接続されていません/.test(e.message), e.message);
+  check('更新失敗の理由を添える', /invalid_client/.test(e.message), e.message);
+}
+authState.lastError = null;
+try { salesforceGet('/x'); check('理由が無いときは添えない', false); }
+catch (e) { check('理由が無いときは添えない', !/更新に失敗/.test(e.message), e.message); }
+try { salesforcePost('/x', {}); check('POSTでも未接続を伝える', false); }
+catch (e) { check('POSTでも未接続を伝える', /接続されていません/.test(e.message)); }
+authState.hasAccess = true;
+
+console.log('\n【12】認可コードの交換に失敗したとき');
+authState.callbackError = new Error('Error retrieving token: invalid_client, <b>x</b>');
+let cbPage = null, threw = false;
+try { cbPage = authCallback({ parameter: {} }); } catch (e) { threw = true; }
+check('例外を投げず画面を返す', !threw && cbPage && typeof cbPage.html === 'string');
+check('失敗を明示する', cbPage && /接続に失敗しました/.test(cbPage.html));
+check('原因（invalid_client）を表示する', cbPage && /invalid_client/.test(cbPage.html));
+check('確認項目を添える', cbPage && /SALESFORCE_CLIENT_SECRET/.test(cbPage.html));
+check('応答内のHTMLを無害化する', cbPage && cbPage.html.indexOf('<b>x</b>') === -1 && /&lt;b&gt;/.test(cbPage.html));
+authState.callbackError = null;
+check('成功時は完了画面', /接続しました/.test(authCallback({ parameter: {} }).html));
+
+console.log('\n【13】シークレットの扱い（接続アプリ側の設定に合わせる）');
+authState.secret = 'unset';
+getSalesforceService();
+check('既定は空（公開クライアント）', authState.secret === '', JSON.stringify(authState.secret));
+scriptProps['SALESFORCE_CLIENT_SECRET'] = 'S3CRET';
+getSalesforceService();
+check('スクリプトプロパティがあれば使う', authState.secret === 'S3CRET', authState.secret);
+delete scriptProps['SALESFORCE_CLIENT_SECRET'];
+
+console.log('\n【14】確認項目とHTMLエスケープ');
+check('< > & を無害化', escapeHtml_('<s>&') === '&lt;s&gt;&amp;', escapeHtml_('<s>&'));
+check('invalid_client: 秘密の案内', /SALESFORCE_CLIENT_SECRET/.test(authFailureHints_('invalid_client')));
+check('invalid_client: コンシューマー鍵の案内', /コンシューマー鍵/.test(authFailureHints_('invalid_client')));
+check('redirect_uri の案内', /コールバックURL/.test(authFailureHints_('redirect_uri_mismatch')));
+check('invalid_grant は再接続を案内', /認証を解除/.test(authFailureHints_('invalid_grant')));
+check('未知のエラーでは案内を出さない', authFailureHints_('something else') === '');
 
 console.log('\n最終結果: ' + pass + ' 件成功, ' + fail + ' 件失敗');
 process.exit(fail ? 1 : 0);
