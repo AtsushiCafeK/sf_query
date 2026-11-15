@@ -187,6 +187,9 @@ ringi:
 
 手順は 👉 [gas/README.md](gas/README.md)
 
+本番構築・運用・セキュリティの説明（引き継ぎ用）：
+[仕組み](gas/docs/ARCHITECTURE.md) / [運用](gas/docs/OPERATIONS.md) / [セキュリティと懸念](gas/docs/SECURITY.md)
+
 ## アーキテクチャ
 
 ```
